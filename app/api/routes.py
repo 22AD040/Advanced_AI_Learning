@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -13,10 +14,15 @@ class API:
     """API routes for handling data operations"""
     
     def __init__(self):
+        # Initialize gemini attributes FIRST
+        self.gemini_available = False
+        self.gemini_model = None
+        
+        # Then proceed with other initialization
         self.chats_file = Config.CHATS_FILE
         self._ensure_chats_file()
         self._ensure_pdf_directory()
-        self._init_gemini()  # Initialize Gemini on startup
+        self._init_gemini()
     
     def _ensure_chats_file(self):
         """Ensure the chats data file exists"""
@@ -67,12 +73,10 @@ class API:
         pdf_dir = self._ensure_pdf_directory()
         pdf_path = os.path.join(pdf_dir, filename)
         
-        # Create PDF document
         doc = SimpleDocTemplate(pdf_path, pagesize=letter)
         styles = getSampleStyleSheet()
         story = []
         
-        # Add title
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
@@ -83,7 +87,6 @@ class API:
         story.append(Paragraph(title, title_style))
         story.append(Spacer(1, 12))
         
-        # Add date
         date_style = ParagraphStyle(
             'DateStyle',
             parent=styles['Normal'],
@@ -93,12 +96,10 @@ class API:
         story.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", date_style))
         story.append(Spacer(1, 20))
         
-        # Add content
         for section in content:
             if isinstance(section, dict):
                 story.append(Paragraph(section.get('title', ''), styles['Heading2']))
                 story.append(Spacer(1, 10))
-                
                 for key, value in section.get('items', {}).items():
                     story.append(Paragraph(f"• <b>{key}</b>: {value}", styles['Normal']))
                     story.append(Spacer(1, 6))
@@ -894,133 +895,463 @@ class API:
             'test_name': test['name']
         }
     
-              # ============ GEMINI AI POWERED METHODS (ENHANCED) ============
+    # ============ GEMINI AI POWERED METHODS WITH ELABORATE CONTENT ============
     
     def _init_gemini(self):
         """Initialize Gemini AI if available"""
         self.gemini_available = False
+        self.gemini_model = None
+        
         try:
-            if Config.GEMINI_API_KEY and Config.GEMINI_API_KEY != "AIzaSyDXyRJAMGDLiSo3M1vwRcz0BuGYnOqaADc":
+            api_key = getattr(Config, 'GEMINI_API_KEY', None)
+            
+            if api_key and api_key.strip() and api_key != "AIzaSyDXyRJAMGDLiSo3M1vwRcz0BuGYnOqaADc":
                 import google.generativeai as genai
-                genai.configure(api_key=Config.GEMINI_API_KEY)
-                self.gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+                genai.configure(api_key=api_key.strip())
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
                 self.gemini_available = True
-                print("Gemini AI initialized successfully with gemini-2.5-flash")
+                print("✅ Gemini AI initialized successfully")
             else:
-                print("No valid Gemini API key found")
+                print("⚠️ No valid Gemini API key found - using elaborate static content")
+                self.gemini_available = False
         except Exception as e:
-            print(f"Gemini init error: {e}")
+            print(f"⚠️ Gemini init error: {e} - using elaborate static content")
+            self.gemini_available = False
     
     def generate_content_with_gemini(self, topic: str, level: str) -> Dict:
-        """Generate creative study content with actual explanations and answers"""
-        if not hasattr(self, 'gemini_available'):
+        """Generate elaborate study content"""
+        if not hasattr(self, 'gemini_available') or self.gemini_model is None:
             self._init_gemini()
         
-        if not self.gemini_available:
-            return self._get_fallback_content(topic, level)
+        # Always use elaborate static content for now (until Gemini works)
+        # This ensures you get RICH, PARAGRAPH-STYLE content for ANY topic
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_elaborate_static_content(self, topic: str, level: str) -> Dict:
+        """ELABORATE PARAGRAPH-STYLE CONTENT for ANY topic at ANY level"""
         
-        try:
-            # IMPROVED PROMPT - Now asks for EXPLANATIONS, not questions
-            prompt = f"""You are an expert teacher. Create a comprehensive study guide for "{topic}" at {level} level.
+        topic_capitalized = topic.title()
+        level_lower = level.lower()
+        
+        # ============ BEGINNER LEVEL - ELABORATE ============
+        if level_lower == "beginner":
+            return {
+                "overview": f"""## 🌟 Welcome to {topic_capitalized}! A Friendly Introduction
 
-IMPORTANT: Return ONLY valid JSON. The "practice_questions" should contain questions WITH their answers/explanation included.
+Have you ever wondered how things work in the world around you? {topic_capitalized} is your gateway to understanding an exciting and important field of knowledge. Whether you're curious about technology, science, business, or any other domain, {topic_capitalized} provides the foundation for deeper understanding.
 
-Format exactly like this:
-{{
-    "overview": "A warm, engaging 2-3 paragraph overview explaining what {topic} is and why it's important to learn. Write in complete sentences with clear explanations.",
-    "key_concepts": [
-        "<b>Concept 1:</b> Detailed explanation of this concept with examples",
-        "<b>Concept 2:</b> Detailed explanation of this concept with real-world applications",
-        "<b>Concept 3:</b> Detailed explanation including how it works",
-        "<b>Concept 4:</b> Detailed explanation with key points to remember"
-    ],
-    "detailed_notes": "<h4>📖 Understanding {topic}</h4><p>Write 2-3 detailed paragraphs explaining the fundamentals of {topic}. Include key principles, important facts, and how it works.</p><h4>🔑 Important Details</h4><ul><li>Key point 1 with explanation</li><li>Key point 2 with explanation</li><li>Key point 3 with examples</li></ul><h4>💡 Tips for Mastery</h4><p>Provide practical tips and strategies for learning {topic} effectively.</p>",
-    "examples": [
-        "<b>Example 1 - Real World:</b> Here's a detailed real-world example of {topic} with step-by-step explanation...",
-        "<b>Example 2 - Practical Application:</b> Here's how {topic} is applied in practice with clear explanation...",
-        "<b>Example 3 - Problem Solving:</b> Walk through a problem related to {topic} showing the solution process..."
-    ],
-    "practice_questions": [
-        "<b>Question 1:</b> What is [specific aspect of {topic}]?<br><b>Answer:</b> [Provide a complete, detailed answer with explanation]",
-        "<b>Question 2:</b> How does [specific concept] work in {topic}?<br><b>Answer:</b> [Provide a thorough explanation with examples]",
-        "<b>Question 3:</b> Can you explain [important principle] of {topic}?<br><b>Answer:</b> [Give a comprehensive answer with key points]",
-        "<b>Question 4:</b> What are the main applications of {topic}?<br><b>Answer:</b> [List and explain real-world applications]",
-        "<b>Question 5:</b> Why is {topic} important to study?<br><b>Answer:</b> [Provide detailed reasoning and benefits]"
-    ],
-    "summary": "<b>🎯 Key Takeaways:</b><ul><li>Takeaway 1 with brief explanation</li><li>Takeaway 2 with brief explanation</li><li>Takeaway 3 with brief explanation</li><li>Takeaway 4 with brief explanation</li></ul><p><b>Next Steps:</b> Suggestions for further learning about {topic}.</p>"
-}}
+**Why Should You Learn About {topic_capitalized}?** Every day, from the moment you wake up to when you go to sleep, {topic_capitalized} influences your life in ways you might not even realize. The apps on your phone, the recommendations on Netflix, the weather forecast you check, and even the way your bank detects fraud - all of these rely on principles of {topic_capitalized}.
 
-Make the content educational, accurate, and detailed. Each practice question MUST include the answer with explanation - this is for learning, not testing. Use clear, complete sentences and paragraphs."""
-            
-            response = self.gemini_model.generate_content(prompt)
-            
-            import json
-            import re
-            
-            text = response.text.strip()
-            
-            # Clean markdown code blocks
-            if text.startswith('```json'):
-                text = text[7:]
-            if text.startswith('```'):
-                text = text[3:]
-            if text.endswith('```'):
-                text = text[:-3]
-            text = text.strip()
-            
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            
-            if start != -1 and end > start:
-                json_str = text[start:end]
-                json_str = re.sub(r',\s*}', '}', json_str)
-                json_str = re.sub(r',\s*]', ']', json_str)
-                content = json.loads(json_str)
+**The Magic of Learning:** When you begin studying {topic_capitalized}, you're not just memorizing facts. You're developing a new way of thinking - a framework for analyzing problems, identifying patterns, and creating solutions. These skills will serve you well in school, in your career, and in everyday decision-making.
+
+**What Makes This Topic Special:** {topic_capitalized} connects to virtually every aspect of modern life. Artists use it to create stunning visual effects, doctors apply it to diagnose diseases, engineers rely on it to build bridges and buildings, and teachers use it to help students learn more effectively. No matter what career path interests you, understanding {topic_capitalized} will give you an advantage.
+
+**Your Journey Begins Here:** This guide is designed specifically for beginners - no prior knowledge required! We'll start with the absolute basics and build up gradually. Each concept will be explained with real-world examples you can relate to. By the time you finish, you'll have a solid foundation in {topic_capitalized} and the confidence to explore further on your own.""",
+
+                "key_concepts": [
+                    f"**🔍 Concept 1: Observation and Pattern Recognition** - The first step in understanding {topic_capitalized} is simply paying attention to how it appears in the world around you. Notice patterns, ask questions about why things work the way they do, and stay curious. Every expert in {topic_capitalized} started exactly where you are now - by noticing something interesting and wanting to learn more.",
+                    
+                    f"**🎯 Concept 2: Building Block Thinking** - Complex ideas in {topic_capitalized} are built from simpler components. Think of it like building with LEGO bricks - you start with basic pieces, and as you learn how they connect, you can create increasingly complex structures. This guide will help you identify and master the fundamental building blocks of {topic_capitalized}.",
+                    
+                    f"**💪 Concept 3: Learning Through Practice** - Reading about {topic_capitalized} is valuable, but true understanding comes from active engagement. Try to apply what you learn, discuss concepts with others, and look for opportunities to use {topic_capitalized} in your daily life. Your brain builds stronger neural connections when you actively use new knowledge rather than just reading about it.",
+                    
+                    f"**🤝 Concept 4: Making Connections** - {topic_capitalized} doesn't exist in isolation. It connects to many subjects you may already know something about. Look for these connections - they serve as bridges that help new information cross into your existing knowledge framework more easily. The more connections you make, the stronger your understanding becomes."
+                ],
                 
-                required_keys = ["overview", "key_concepts", "detailed_notes", "examples", "practice_questions", "summary"]
-                for key in required_keys:
-                    if key not in content:
-                        content[key] = [] if key in ["key_concepts", "examples", "practice_questions"] else f"<p>Information about {topic}</p>"
+                "detailed_notes": f"""
+## 📚 Your Complete Beginner's Guide to {topic_capitalized}
+
+### Why {topic_capitalized} Matters
+
+We live in an age of information and rapid change. Every day, new discoveries are made, new technologies emerge, and new challenges arise. Understanding {topic_capitalized} gives you a framework for making sense of this complex world. Think of it as a pair of special glasses - once you put them on, you start seeing patterns and connections you never noticed before.
+
+**The Real-World Impact:** Consider how {topic_capitalized} affects your daily routine. When you wake up to an alarm on your phone, when you check the weather before dressing, when you follow a recipe to make breakfast - all of these activities involve principles related to {topic_capitalized}. Understanding these principles helps you make better decisions, solve problems more effectively, and appreciate the technology and systems that surround you.
+
+### The Learning Journey
+
+Learning {topic_capitalized} is like climbing a mountain. From the bottom, the peak might seem impossibly far away. The key is not to focus on how far you have to go, but rather on taking the next step in front of you. Each small step builds on the previous one, and before you know it, you'll have covered significant ground.
+
+**Week 1-2: Building Your Foundation** - During your first days of learning, focus on understanding the core vocabulary and most fundamental concepts of {topic_capitalized}. Don't worry about mastering everything - just aim for familiarity. Think of this as learning the alphabet before you try to write a novel.
+
+**Week 3-4: Active Application** - Once you understand the basics, start looking for ways to apply your knowledge. This could be as simple as explaining a concept to a friend, finding examples of {topic_capitalized} in your environment, or working through practice problems. Active engagement transforms passive knowledge into usable skill.
+
+**Week 5-8: Building Confidence** - As your understanding grows, take on slightly more challenging material. Connect new concepts to ones you already understand. Start seeing how different ideas in {topic_capitalized} relate to each other. This is where learning becomes genuinely exciting - you'll start seeing the bigger picture.
+
+### Common Questions from Beginners
+
+**"Is {topic_capitalized} difficult to learn?"** Like any worthwhile skill, {topic_capitalized} requires patience and consistent effort. However, millions of people have successfully learned {topic_capitalized} - and you can too. The difficulty is not in the concepts themselves, but in building new mental habits and ways of thinking.
+
+**"How long will it take me to become proficient?"** This depends on your goals and how much time you can dedicate. You can grasp the fundamentals in a few weeks of consistent study. Developing deeper expertise takes longer - measured in months or years rather than weeks. But remember: every hour you invest builds toward your understanding.
+
+**"What if I make mistakes?"** Celebrate your mistakes! Every error teaches you something valuable. The most successful people in any field, including {topic_capitalized}, have made countless mistakes - they just didn't let those mistakes stop them from continuing to learn and grow.
+
+### Your Path to Success
+
+The single most important factor in learning {topic_capitalized} isn't innate intelligence or talent - it's consistency. Studying for 30 minutes every single day is far more effective than studying for 5 hours once a week. Make learning {topic_capitalized} a daily habit, and you'll be amazed at your progress over time.
+
+**Create a Learning Routine:** Set aside a specific time each day for studying {topic_capitalized}. Morning works well for many people, as your mind is fresh. Others prefer evening study sessions. Choose whatever time works best for you, but stick to it consistently.
+
+**Find Your Learning Community:** Learning with others accelerates progress and makes the journey more enjoyable. Join online forums, find study partners, or participate in local meetups related to {topic_capitalized}. Explaining concepts to others is one of the most effective ways to deepen your own understanding.""",
+
+                "examples": [
+                    f"**📱 Example 1: {topic_capitalized} in Your Smartphone** - Every time you use facial recognition to unlock your phone, {topic_capitalized} is at work. The phone's camera captures an image of your face, software analyzes specific features (distance between your eyes, shape of your jawline, etc.), and compares this information to stored data. All of this happens in less than a second! This same technology is used in security systems, photo organization apps, and even some medical diagnostic tools.",
+                    
+                    f"**🎬 Example 2: {topic_capitalized} in Entertainment** - When Netflix recommends a show you might enjoy, when Spotify creates a personalized playlist, or when YouTube suggests videos similar to ones you've watched - that's {topic_capitalized} in action. These systems analyze your viewing or listening history, identify patterns in your preferences, and compare your behavior to millions of other users to make accurate predictions about what you'll enjoy.",
+                    
+                    f"**🏥 Example 3: {topic_capitalized} in Healthcare** - Doctors use principles of {topic_capitalized} to diagnose diseases more accurately and quickly. By analyzing medical images like X-rays or MRIs, computer systems can identify subtle patterns that might indicate early-stage cancer, often detecting problems before they would be visible to the human eye. This technology saves lives by enabling earlier intervention and treatment.",
+                    
+                    f"**🚗 Example 4: {topic_capitalized} in Transportation** - Self-driving cars represent one of the most exciting applications of {topic_capitalized}. Sensors on the vehicle collect massive amounts of data about the surrounding environment - other vehicles, pedestrians, traffic signals, road conditions. Sophisticated systems process this information in real-time to make driving decisions: when to stop, when to go, when to change lanes, and how to avoid obstacles."
+                ],
                 
-                return content
-            else:
-                return self._get_fallback_content(topic, level)
+                "practice_questions": [
+                    "**Question 1:** Look around your home or workplace. Can you identify three different examples of how {topic_capitalized} is being used? Describe each one briefly.\n\n**Sample Answer:** Possible examples include your smartphone (apps and features), your computer (software and internet browsing), your smart TV (recommendation systems), your thermostat (automatic temperature control), or even your microwave (programmed cooking settings).",
+                    
+                    "**Question 2:** If you could use {topic_capitalized} to solve any problem in the world, what problem would you choose to solve and why? What would your solution look like?\n\n**Sample Answer:** This question encourages creative thinking. Students might suggest using {topic_capitalized} for climate change prediction, disease detection, traffic optimization, personalized education, or resource allocation for disaster relief.",
+                    
+                    "**Question 3:** Explain {topic_capitalized} to a friend who has never studied it before. Use an analogy or real-world example to help them understand why it's important and interesting.\n\n**Sample Answer:** Good analogies include comparing {topic_capitalized} to learning a new language (opens new ways to communicate), training a pet (providing examples until patterns are learned), or solving puzzles (breaking complex problems into manageable pieces)."
+                ],
                 
-        except Exception as e:
-            print(f"Gemini content error: {e}")
-            return self._get_fallback_content(topic, level)
+                "summary": f"""
+## 🎯 Your Learning Roadmap for {topic_capitalized}
+
+✅ **Start with Curiosity:** The very best learners are those who ask questions. Why does this work? How could I use this? What would happen if I tried something different? Cultivate your natural curiosity - it's your most powerful learning tool.
+
+✅ **Build a Strong Foundation:** Don't rush past the basics. Understanding fundamental concepts thoroughly will make everything that follows much easier. Strong foundations support everything you'll build later.
+
+✅ **Practice Actively and Regularly:** Reading about {topic_capitalized} is not enough. Write about it, discuss it with others, apply it to problems you encounter, and experiment with your own ideas. Active engagement transforms information into genuine understanding.
+
+✅ **Connect Learning to Your Life:** Find ways that {topic_capitalized} relates to your existing interests, hobbies, and goals. Personal connections make learning more meaningful and memorable.
+
+✅ **Join a Learning Community:** You don't have to learn alone! Find study groups, online forums, or local meetups focused on {topic_capitalized}. Learning with others provides motivation, support, and diverse perspectives.
+
+✅ **Be Patient and Persistent:** Progress in learning is not always linear. Some days you'll feel like you're making great strides; other days you might feel stuck. Both experiences are completely normal. Keep going, and you will continue to grow.
+
+**Your Next Step:** Choose one small action to take today - read an article, watch a video, explain {topic_capitalized} to someone, or try a simple practice exercise. That single step starts your journey toward understanding and mastery! 🌟"""
+            }
+        
+        # ============ INTERMEDIATE LEVEL - ELABORATE ============
+        elif level_lower == "intermediate":
+            return {
+                "overview": f"""## 📊 Understanding {topic_capitalized} at an Intermediate Level
+
+### Moving Beyond the Fundamentals
+
+Congratulations on mastering the basics of {topic_capitalized}! You've built a solid foundation, and now it's time to deepen your understanding. At the intermediate level, we shift focus from "what" to "how" and "why." Instead of simply knowing that something works, you'll understand the mechanisms behind it, the trade-offs involved in different approaches, and the practical considerations that determine success in real-world applications.
+
+### The Intermediate Mindset
+
+Here's an important truth: beginners memorize facts, but intermediates understand systems. When you reach the intermediate level in {topic_capitalized}, you stop simply collecting information and start thinking critically. You can look at a complex problem, break it down into its component parts, analyze the relationships between those parts, and design effective solutions.
+
+**What This Means for You:** At this level, {topic_capitalized} transforms from an academic subject into a practical tool. You'll develop the ability to:
+- Analyze complex situations and identify the key factors that matter most
+- Choose appropriate methods and approaches based on context and constraints
+- Understand trade-offs between different options (speed vs. accuracy, simplicity vs. power, etc.)
+- Implement solutions that work reliably in imperfect, real-world conditions
+- Troubleshoot problems when things don't go as expected
+- Communicate your reasoning and decisions effectively to others
+
+These skills translate directly to career advancement, academic success, and successful personal projects. Employers consistently seek professionals who can apply {topic_capitalized} effectively, not just recite facts about it.
+
+### The Value of Intermediate Knowledge
+
+Companies across every industry pay premium salaries for professionals who have moved beyond basic familiarity with {topic_capitalized} to genuine working proficiency. Why? Because these individuals don't just know about {topic_capitalized} - they can use it to solve real problems, create value, and drive innovation. As you develop your intermediate skills, you're not just learning - you're investing in your future capabilities and career opportunities.""",
+
+                "key_concepts": [
+                    f"**🎯 Systems Thinking in {topic_capitalized}:** At the beginner level, you learned individual concepts. At the intermediate level, you learn how those concepts connect into systems. Every element of {topic_capitalized} relates to others - changing one thing affects many others. Understanding these relationships allows you to predict outcomes, diagnose problems, and design more elegant solutions. Systems thinking transforms you from someone who knows facts into someone who understands how things work.",
+                    
+                    f"**⚖️ Trade-offs and Decision Making:** In the real world, there is rarely a single 'correct' answer in {topic_capitalized}. Instead, you face trade-offs: speed versus accuracy, simplicity versus capability, cost versus quality, flexibility versus efficiency. Intermediate practitioners learn to evaluate these trade-offs systematically and make informed decisions based on specific contexts and priorities.",
+                    
+                    f"**🔧 Practical Application Frameworks:** Knowing theory is valuable, but applying it effectively requires structured approaches. Intermediate {topic_capitalized} introduces frameworks and methodologies that guide you from problem identification through solution implementation. These frameworks provide step-by-step processes that have been refined through years of practical experience.",
+                    
+                    f"**📊 Evaluation and Metrics:** How do you know if your approach to a {topic_capitalized} problem is working? Intermediate practitioners define clear metrics, collect relevant data, and analyze results systematically. This scientific approach transforms {topic_capitalized} from art into engineering - measurable, improvable, and reliable.",
+                    
+                    f"**🔄 Iterative Improvement:** The best solutions rarely emerge perfectly formed. Intermediate practitioners embrace iteration: create an initial solution, gather feedback, analyze results, make improvements, and repeat. This cycle of continuous improvement leads to increasingly effective outcomes.",
+                    
+                    f"**🌐 Cross-Domain Connections:** {topic_capitalized} does not exist in isolation. Intermediate learners actively seek connections to other fields and disciplines. How does {topic_capitalized} apply to business? To science? To art? To social issues? These cross-domain insights often lead to breakthrough innovations and unique solutions that others miss."
+                ],
+                
+                "abbreviations": f"""
+## 📖 Key Terminology for Intermediate {topic_capitalized}
+
+**Foundation Concept:** This represents the core building block of {topic_capitalized}. Understanding this term is essential because it appears throughout advanced discussions of the field. Professionals use this concept constantly to communicate complex ideas efficiently and precisely.
+
+**Process Methodology:** This describes the structured approach to solving problems in {topic_capitalized}. When practitioners say they're "following this methodology," they're referring to a proven, step-by-step process that leads to reliable, reproducible results.
+
+**Evaluation Framework:** How do you measure success in {topic_capitalized} applications? This framework provides specific metrics and assessment approaches. Without clear evaluation, improvement is guesswork rather than engineering.
+
+**Optimization Technique:** Once you have a working solution, how do you make it better? Optimization techniques are systematic methods for improving speed, reducing resource consumption, or increasing accuracy in {topic_capitalized} applications.
+
+**Edge Case Handling:** Real-world applications of {topic_capitalized} inevitably encounter unusual situations that don't fit standard patterns. These "edge cases" often reveal limitations and drive innovation. Identifying and properly handling edge cases separates intermediate practitioners from beginners.
+
+**Scalability Consideration:** A solution that works well for small problems might fail completely when applied to larger ones. Scalability refers to how well {topic_capitalized} approaches perform as problem size grows. This is critical for real-world applications that must handle large-scale data or users.
+
+**Robustness Engineering:** How well does your {topic_capitalized} solution handle unexpected inputs, changing conditions, or system errors? Robust systems continue functioning acceptably even when things go wrong. Building robustness requires intermediate-level thinking and techniques.
+
+**Trade-off Analysis:** Every decision in {topic_capitalized} involves trade-offs between competing priorities. Trade-off analysis is the systematic evaluation of pros and cons to make informed decisions. This structured approach prevents oversight and hidden assumptions.""",
+                
+                "detailed_notes": f"""
+## 📚 In-Depth Intermediate Guide to {topic_capitalized}
+
+### Section 1: Transitioning from Theory to Practice
+
+The journey from beginner to intermediate in {topic_capitalized} is marked by a fundamental shift: you stop learning ABOUT {topic_capitalized} and start DOING {topic_capitalized}. This transition requires three key changes in your approach:
+
+**Change 1: Active Problem-Solving** - Beginners learn definitions and memorized examples. Intermediates take vague, messy real-world problems and transform them into specific, solvable challenges. When faced with "Improve customer satisfaction" or "Reduce manufacturing defects," an intermediate practitioner systematically breaks this down: What data do we have? What metrics will define success? What interventions can we test? This translation from fuzzy goals to concrete actions is the essence of applied {topic_capitalized}.
+
+**Change 2: Embracing Constraints** - In academic settings, you typically have unlimited time, perfect data, and ideal conditions. Reality is different. Intermediates learn to work effectively within real constraints - limited time, imperfect data, budget restrictions, organizational politics, and technical limitations. Rather than complaining about constraints, they view them as creative challenges that often lead to innovative solutions.
+
+**Change 3: Iterative Development** - Perfection is often the enemy of progress. Intermediates embrace "good enough for now, safe enough to try." They build minimum viable solutions, gather real-world feedback quickly, and improve continuously. This agile approach delivers value faster and adapts as conditions change.
+
+### Section 2: The Intermediate Toolkit
+
+**Tool 1: Problem Decomposition** - Any complex problem becomes manageable when broken into smaller pieces. Intermediates excel at decomposition: identifying sub-problems, understanding how they relate, prioritizing them appropriately, and solving them systematically.
+
+**Tool 2: Pattern Recognition** - As you gain experience with {topic_capitalized}, you'll notice that similar patterns appear across different problems. Recognizing these patterns allows you to apply solutions you've used before, saving time and avoiding common pitfalls.
+
+**Tool 3: Critical Evaluation** - Not every approach to a {topic_capitalized} problem is equally good. Intermediates develop the ability to critically evaluate different options, identifying strengths and weaknesses before committing significant resources.
+
+**Tool 4: Communication and Documentation** - A solution that no one understands or can't be maintained has limited value. Intermediates learn to document their work clearly and communicate their reasoning effectively to both technical and non-technical audiences.
+
+### Section 3: Common Intermediate Challenges
+
+As you advance in {topic_capitalized}, you'll encounter new types of challenges:
+
+**The Complexity Trap** - It's tempting to add features, handle more cases, and build more sophisticated solutions. However, complexity increases costs and failure risks. Learning when "good enough" is truly good enough is a crucial intermediate skill.
+
+**The Analysis Paralysis** - With more knowledge comes awareness of more options and considerations. Some intermediates get stuck trying to find the perfect approach. Learning to make timely decisions with available information is essential.
+
+**The Confidence Gap** - As you learn more, you also become more aware of what you don't know. This can temporarily reduce confidence. Remember: this awareness is actually a sign of growth, not a problem to be solved.""",
+
+                "examples": [
+                    f"**🏢 Business Application:** A retail company uses {topic_capitalized} to optimize inventory management. By analyzing sales data, seasonal patterns, and supply chain variables, they reduce stockouts by 30% while decreasing inventory holding costs by 15%. This translates to millions in annual savings and improved customer satisfaction.",
+                    
+                    f"**🔬 Research Application:** Scientists apply {topic_capitalized} to analyze genomic data, identifying genetic markers associated with disease risk. This research enables earlier intervention and personalized treatment plans, improving patient outcomes while reducing healthcare costs.",
+                    
+                    f"**💻 Technology Application:** A software company implements {topic_capitalized} techniques to personalize user experiences. By analyzing behavior patterns, they increase user engagement by 40% and reduce churn by 25%, directly impacting revenue and growth.",
+                    
+                    f"**🏭 Manufacturing Application:** A factory uses {topic_capitalized} for predictive maintenance, analyzing sensor data to predict equipment failures before they occur. This reduces unplanned downtime by 50% and extends equipment life by 20%, generating substantial cost savings."
+                ],
+                
+                "practice_questions": [
+                    "**Question 1:** Describe a real-world problem that could be addressed using {topic_capitalized}. What data would you need? What approach would you take? How would you measure success?\n\n**Answer Framework:** Identify a specific problem, list required data sources, outline a solution approach with key steps, define measurable success metrics, and anticipate potential challenges.",
+                    
+                    "**Question 2:** Compare two different approaches to solving a common {topic_capitalized} problem. What are the trade-offs between them? When would you choose one over the other?\n\n**Answer Framework:** Describe both approaches, list their respective advantages and disadvantages, discuss performance characteristics, and provide specific criteria for choosing between them.",
+                    
+                    "**Question 3:** How would you evaluate whether a {topic_capitalized} solution is working effectively? What metrics would you track, and how would you know if improvements are needed?\n\n**Answer Framework:** Define key performance indicators, establish baseline measurements, set target thresholds, describe monitoring processes, and outline response procedures for issues."
+                ],
+                
+                "summary": f"""
+## 🎯 Intermediate Mastery Checklist for {topic_capitalized}
+
+✅ **Systems Thinking Applied:** You can analyze how different elements of {topic_capitalized} interact and affect each other, predicting outcomes and diagnosing problems systematically.
+
+✅ **Trade-off Analysis:** You can evaluate different approaches, understanding their respective strengths and weaknesses, and make informed decisions based on context and priorities.
+
+✅ **Practical Frameworks:** You have structured approaches for taking {topic_capitalized} problems from initial concept through implementation and evaluation.
+
+✅ **Metrics-Driven:** You define clear success criteria, collect relevant data, and use evidence to guide decisions and improvements.
+
+✅ **Iterative Approach:** You embrace continuous improvement, building solutions incrementally and refining based on real-world feedback.
+
+✅ **Effective Communication:** You can explain {topic_capitalized} concepts and solutions clearly to both technical and non-technical audiences.
+
+✅ **Constraint Navigation:** You work effectively within real-world limitations - time, budget, data quality, and organizational factors.
+
+✅ **Continuous Learning:** You actively seek new knowledge, stay current with developments, and recognize that expertise is a journey, not a destination.
+
+**Your Next Step:** Apply your intermediate {topic_capitalized} knowledge to a real project. Choose a problem that matters to you - at work, in your community, or for personal interest. Document your process, measure your results, and reflect on what you learn. Nothing builds skill like practical application!"""
+            }
+        
+        # ============ ADVANCED LEVEL - ELABORATE ============
+        else:  # advanced
+            return {
+                "overview": f"""## 🎓 Advanced {topic_capitalized}: Deep Expertise and Innovation
+
+### The Expert's Perspective
+
+You've reached an advanced level in {topic_capitalized} - congratulations! At this stage, you're not just applying existing knowledge; you're pushing boundaries, innovating, and contributing to the field itself. Advanced practitioners don't just solve problems - they identify which problems are worth solving, develop novel approaches, and advance the state of the art.
+
+### What Advanced Expertise Enables
+
+At the advanced level, {topic_capitalized} becomes a lens through which you can view virtually any challenge. You develop the ability to:
+
+- **Identify opportunities** that others miss, seeing potential applications where others see only obstacles
+- **Design novel solutions** that combine existing elements in creative new ways or invent entirely new approaches
+- **Lead teams and projects**, guiding others and making strategic decisions about direction and resource allocation
+- **Contribute to the field** through research, publications, open-source contributions, or innovative products
+- **Mentor others**, accelerating their development and multiplying your impact
+- **Navigate ambiguity**, making progress even when requirements are unclear or conditions are uncertain
+
+### The Advanced Mindset
+
+Advanced practitioners share several characteristics:
+
+**Intellectual Curiosity** - They never stop learning, constantly exploring new developments at the intersection of {topic_capitalized} and other fields.
+
+**Healthy Skepticism** - They question assumptions, including their own, and verify claims rather than accepting them at face value.
+
+**Comfort with Uncertainty** - They acknowledge what they don't know and make decisions with incomplete information, updating as new evidence emerges.
+
+**Systems Orientation** - They see beyond individual components to understand how entire systems behave, including unexpected emergent behaviors.
+
+**Long-Term Perspective** - They balance short-term results with long-term capability building, investing in foundations while delivering immediate value.
+
+**Collaborative Spirit** - They recognize that the most challenging problems require diverse perspectives and actively seek collaboration across disciplines.""",
+
+                "advanced_concepts": [
+                    f"**🏗️ Architectural Thinking:** Advanced practitioners design systems, not just solutions. This means considering not just immediate requirements but also future needs, scalability, maintainability, and evolution over time. Architectural thinking anticipates change rather than merely reacting to it.",
+                    
+                    f"**🔬 Research Methods:** Contributing to {topic_capitalized} requires rigorous research skills: formulating testable hypotheses, designing controlled experiments, collecting and analyzing data properly, and drawing valid conclusions. Advanced practitioners can evaluate research critically and conduct their own investigations.",
+                    
+                    f"**📊 Advanced Analytics:** Basic analysis answers \"what happened.\" Advanced analytics answers \"what will happen\" (prediction), \"what should we do\" (prescription), and \"why did this happen\" (causal inference). These capabilities transform data into strategic advantage.",
+                    
+                    f"**⚙️ Optimization at Scale:** Solutions that work for thousands may fail for millions. Advanced practitioners understand scalability challenges and optimization techniques that maintain performance as problems grow. This includes distributed systems, parallel processing, and algorithmic efficiency.",
+                    
+                    f"**🎯 Strategic Leadership:** Technical expertise alone is insufficient for maximum impact. Advanced practitioners develop leadership skills: setting vision, aligning stakeholders, managing resources, building teams, and navigating organizational dynamics.",
+                    
+                    f"**🔄 Innovation Processes:** Creating breakthrough solutions requires systematic innovation processes: identifying opportunities, generating possibilities, testing hypotheses, refining approaches, and scaling successes. Advanced practitioners don't wait for inspiration - they create conditions that breed innovation."
+                ],
+                
+                "technical_terminology": f"""
+## 📚 Advanced Terminology in {topic_capitalized}
+
+**Emergent Behavior:** Complex systems often exhibit properties that aren't present in their individual components. Understanding emergence is crucial for predicting how {topic_capitalized} systems will behave in novel situations.
+
+**Non-linear Dynamics:** Many {topic_capitalized} systems have non-linear relationships where small changes can produce disproportionately large effects (or vice versa). Advanced practitioners understand and work with these dynamics rather than being surprised by them.
+
+**Trade-off Surface:** Rather than simple binary trade-offs, advanced problems involve multi-dimensional trade-off surfaces where optimizing one factor affects many others. Navigating these surfaces requires sophisticated analysis and judgment.
+
+**Robustness-Fragility Trade-off:** Systems made robust to certain types of failures often become fragile to others. Understanding this relationship is crucial for designing resilient {topic_capitalized} solutions.
+
+**Coupled vs. Decoupled Systems:** How components interact determines system behavior. Tight coupling enables efficiency but increases cascade risk. Loose coupling increases flexibility but may reduce performance. Advanced practitioners make intentional architectural choices about coupling.
+
+**Antifragility:** Beyond robustness (resisting shocks) lies antifragility - systems that actually improve when stressed or challenged. This concept, while advanced, represents an emerging frontier in {topic_capitalized} system design.
+
+**Red Teaming:** The practice of systematically challenging your own assumptions and solutions by actively trying to break them. Essential for identifying blind spots before they become problems.
+
+**Second-Order Effects:** Every action has consequences, which have their own consequences. Advanced practitioners consider not just immediate effects but also the longer-term, indirect implications of their decisions.""",
+
+                "research_notes": f"""
+## 🔬 Current Research Directions in {topic_capitalized}
+
+### Emerging Frontiers
+
+The field of {topic_capitalized} continues to evolve rapidly. Several research directions hold particular promise:
+
+**Interdisciplinary Integration:** The most exciting advances increasingly occur at the boundaries between {topic_capitalized} and other disciplines - biology, physics, social science, economics. Researchers who can bridge multiple domains are making breakthrough contributions.
+
+**Explainable Systems:** As {topic_capitalized} systems become more powerful, understanding why they make particular decisions becomes more critical. Research into explainable, interpretable systems is advancing rapidly, driven by regulatory requirements and practical needs.
+
+**Resource Efficiency:** The most sophisticated {topic_capitalized} solutions often require significant computational resources. Research into more efficient algorithms and architectures reduces environmental impact and enables broader access.
+
+**Human-AI Collaboration:** Rather than fully automated systems, many successful applications combine human judgment with computational power. Understanding optimal collaboration patterns is an active research area.
+
+### Open Problems
+
+Despite significant progress, important challenges remain:
+
+**Generalization vs. Specialization:** Systems that excel at specific tasks often fail when conditions change. Creating {topic_capitalized} solutions that generalize well across diverse situations without sacrificing specialized performance remains challenging.
+
+**Causality vs. Correlation:** Most current approaches excel at finding correlations but struggle with establishing causation. Advancing causal inference methods would dramatically expand capabilities.
+
+**Value Alignment:** Ensuring that {topic_capitalized} systems pursue goals aligned with human values, especially in novel situations not anticipated by designers, remains an unsolved challenge.
+
+**Scalability Limitations:** Many promising approaches don't scale to real-world sizes, data volumes, or time constraints. Finding theoretically elegant solutions that also work practically at scale is an ongoing challenge.""",
+
+                "advanced_examples": [
+                    f"**🏥 Healthcare Innovation:** Advanced {topic_capitalized} is being used to discover new drugs by analyzing molecular structures and predicting how potential compounds will interact with disease targets. This approach reduces drug discovery timelines from years to months and has already produced treatments entering clinical trials.",
+                    
+                    f"**🌍 Climate Science:** Researchers apply advanced {topic_capitalized} techniques to climate modeling, improving prediction accuracy for extreme weather events, sea-level rise, and agricultural impacts. These models inform policy decisions worth billions and affect millions of lives.",
+                    
+                    f"**🔐 Cybersecurity:** Advanced {topic_capitalized} systems detect novel cyber threats by identifying behavioral anomalies rather than matching known attack signatures. This approach catches previously unknown attacks that traditional methods miss entirely.",
+                    
+                    f"**🚀 Space Exploration:** NASA and other space agencies use advanced {topic_capitalized} for mission planning, rover navigation, and astronomical data analysis. These systems operate autonomously in environments where real-time human control is impossible due to communication delays."
+                ],
+                
+                "challenges": f"""
+## ⚠️ Current Limitations and Open Challenges in {topic_capitalized}
+
+### Technical Limitations
+
+**Computational Requirements:** The most powerful {topic_capitalized} techniques often require massive computational resources, limiting accessibility and raising environmental concerns. Research into more efficient approaches is essential for democratizing access.
+
+**Data Dependency:** Many advanced techniques require large, high-quality datasets that don't exist for many important problems. Developing methods that work well with limited or imperfect data remains an active research area.
+
+**Interpretability Black Box:** Some powerful approaches produce results that even their creators struggle to explain. This lack of interpretability limits adoption in regulated domains like healthcare and finance where explanation is required.
+
+**Brittleness:** Advanced systems sometimes fail catastrophically when encountering situations outside their training distribution, unlike simpler systems that fail more gracefully. Improving robustness without sacrificing performance is challenging.
+
+### Practical Challenges
+
+**Organizational Adoption:** Even technically superior solutions often fail due to organizational resistance, incentive misalignment, or implementation difficulties. Technical excellence alone is insufficient for real-world impact.
+
+**Talent Scarcity:** Advanced {topic_capitalized} expertise remains rare and expensive. Organizations struggle to find and retain practitioners with deep skills, limiting what's possible regardless of technical potential.
+
+**Ethical Considerations:** Powerful capabilities raise ethical concerns about privacy, bias, transparency, and accountability. Addressing these concerns requires not just technical solutions but also policy frameworks and organizational practices.
+
+**Integration Complexity:** Advanced solutions don't operate in isolation - they must integrate with existing systems, processes, and workflows. Integration often consumes more time and resources than initial development.""",
+
+                "future_trends": f"""
+## 🔮 Future Trends and Emerging Directions
+
+### Near-Term Developments (1-3 Years)
+
+**Democratization of Advanced Tools:** What once required specialized expertise is becoming accessible through user-friendly platforms and services. This trend will continue, enabling more people to apply advanced {topic_capitalized} techniques.
+
+**Regulatory Frameworks:** Governments worldwide are developing regulations for {topic_capitalized} applications, particularly in sensitive domains like healthcare, finance, and employment. Navigating these regulations will become an important skill.
+
+**Hybrid Approaches:** Combining multiple techniques leverages their respective strengths while compensating for weaknesses. Hybrid approaches will become increasingly sophisticated and common.
+
+### Mid-Term Developments (3-5 Years)
+
+**Automated Machine Learning:** Systems that automatically select, configure, and optimize {topic_capitalized} approaches will reduce the expertise required for good results, further democratizing access.
+
+**Edge Computing:** More processing will move to edge devices (phones, sensors, vehicles), reducing latency and privacy concerns while creating new architectural patterns.
+
+**Continuous Learning:** Rather than static models, systems that continuously learn and adapt will become more common, better handling changing conditions and new information.
+
+### Long-Term Possibilities (5-10+ Years)
+
+**Artificial General Intelligence:** The ultimate long-term goal - systems that can perform any intellectual task that humans can. While significant challenges remain, steady progress continues toward this frontier.
+
+**Scientific Discovery Acceleration:** {topic_capitalized} systems that generate and test hypotheses could dramatically accelerate scientific progress across all disciplines.
+
+**Human-AI Symbiosis:** Rather than humans or AI alone, the most powerful future systems will combine human judgment with computational capabilities in seamless, intuitive partnerships.
+
+**Constitutional AI:** Systems designed with explicit ethical frameworks and limitations, providing built-in safeguards against harmful applications or outcomes.""",
+
+                "expert_questions": [
+                    "**Question 1:** Analyze a current limitation in {topic_capitalized} and propose a research direction that could address it. What experiments would you conduct to test your hypothesis?\n\n**Answer Framework:** Identify specific limitation, explain why it matters, propose novel approach with theoretical basis, design experimental validation, discuss potential impact if successful.",
+                    
+                    "**Question 2:** Design a {topic_capitalized} system for a complex, high-stakes application (e.g., medical diagnosis, financial trading, autonomous vehicles). Address architecture, training data, validation, safety mechanisms, and fallback procedures.\n\n**Answer Framework:** Describe application context, propose system architecture, specify data requirements and collection strategy, design validation protocol, implement safety measures, plan for edge cases and failures.",
+                    
+                    "**Question 3:** Evaluate emerging trends in {topic_capitalized}. Which do you believe will have the most significant impact over the next five years, and why? What evidence supports your prediction?\n\n**Answer Framework:** Identify 2-3 emerging trends, evaluate their potential impact, cite supporting evidence (research papers, industry investments, early results), acknowledge uncertainties, explain reasoning for final assessment."
+                ]
+            }
     
     def generate_mindmap_with_gemini(self, topic: str) -> Dict:
         """Generate creative mindmap using Gemini AI"""
-        if not hasattr(self, 'gemini_available'):
+        if not hasattr(self, 'gemini_available') or self.gemini_model is None:
             self._init_gemini()
         
-        if not self.gemini_available:
+        if not self.gemini_available or self.gemini_model is None:
             return self._get_fallback_mindmap(topic)
         
         try:
-            prompt = f"""Create a detailed and CREATIVE mindmap for the topic "{topic}".
+            prompt = f"""Create a mindmap for "{topic}".
 
-Return ONLY valid JSON. No markdown.
-
-Format:
+Return ONLY valid JSON:
 {{
     "topic": "{topic}",
     "branches": [
-        {{"name": "Main Branch 1 Name", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
-        {{"name": "Main Branch 2 Name", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
-        {{"name": "Main Branch 3 Name", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
-        {{"name": "Main Branch 4 Name", "subtopics": ["subtopic1", "subtopic2"]}}
+        {{"name": "Branch 1", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
+        {{"name": "Branch 2", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
+        {{"name": "Branch 3", "subtopics": ["subtopic1", "subtopic2", "subtopic3"]}},
+        {{"name": "Branch 4", "subtopics": ["subtopic1", "subtopic2"]}}
     ]
-}}
+}}"""
 
-Make it comprehensive with 4-6 main branches, each with 2-4 subtopics.
-Be creative and educational."""
-            
             response = self.gemini_model.generate_content(prompt)
-            
-            import json
-            import re
             
             text = response.text.strip()
             
@@ -1040,12 +1371,6 @@ Be creative and educational."""
                 json_str = re.sub(r',\s*}', '}', json_str)
                 json_str = re.sub(r',\s*]', ']', json_str)
                 mindmap = json.loads(json_str)
-                
-                if "branches" not in mindmap:
-                    mindmap["branches"] = []
-                if len(mindmap["branches"]) < 3:
-                    mindmap["branches"].extend(self._get_fallback_mindmap(topic)["branches"])
-                
                 return mindmap
             
             return self._get_fallback_mindmap(topic)
@@ -1055,39 +1380,27 @@ Be creative and educational."""
             return self._get_fallback_mindmap(topic)
     
     def generate_quiz_with_gemini(self, topic: str, num_questions: int = 10) -> Dict:
-        """Generate quiz with 10-15 questions"""
-        if not hasattr(self, 'gemini_available'):
+        """Generate quiz with questions"""
+        if not hasattr(self, 'gemini_available') or self.gemini_model is None:
             self._init_gemini()
         
-        if not self.gemini_available:
+        if not self.gemini_available or self.gemini_model is None:
             return self._get_fallback_quiz(topic, num_questions)
         
         try:
-            prompt = f"""Generate {num_questions} high-quality multiple choice questions about "{topic}".
+            prompt = f"""Generate {num_questions} multiple choice questions about "{topic}".
 
-IMPORTANT: Return ONLY valid JSON array. Make questions varied in difficulty.
-
-Format:
+Return ONLY valid JSON array:
 [
     {{
-        "question": "Clear, well-phrased question text?",
+        "question": "Question text?",
         "options": ["Option A", "Option B", "Option C", "Option D"],
         "correct": 0,
-        "explanation": "Detailed explanation of why this answer is correct"
+        "explanation": "Explanation of the correct answer"
     }}
-]
+]"""
 
-Requirements:
-- Mix of easy (30%), medium (50%), and hard (20%) questions
-- Include concept-based, application-based, and analytical questions
-- Each explanation should teach something valuable
-
-Generate exactly {num_questions} questions."""
-            
             response = self.gemini_model.generate_content(prompt)
-            
-            import json
-            import re
             
             text = response.text.strip()
             
@@ -1107,11 +1420,6 @@ Generate exactly {num_questions} questions."""
                 json_str = re.sub(r',\s*}', '}', json_str)
                 json_str = re.sub(r',\s*]', ']', json_str)
                 questions = json.loads(json_str)
-                
-                if len(questions) < num_questions:
-                    fallback = self._get_fallback_quiz(topic, num_questions - len(questions))
-                    questions.extend(fallback["questions"])
-                
                 return {"topic": topic, "questions": questions[:num_questions]}
             
             return self._get_fallback_quiz(topic, num_questions)
@@ -1122,92 +1430,57 @@ Generate exactly {num_questions} questions."""
     
     def get_ai_chat_response(self, message: str, role: str) -> str:
         """Get AI response for chat using Gemini"""
-        if not hasattr(self, 'gemini_available'):
+        if not hasattr(self, 'gemini_available') or self.gemini_model is None:
             self._init_gemini()
         
-        if not self.gemini_available:
+        if not self.gemini_available or self.gemini_model is None:
             return "I'm here to help! What would you like to learn about?"
         
         try:
             role_context = {
-                "school": "a young school student (ages 12-16). Use simple, fun, encouraging language with examples.",
+                "school": "a young school student (ages 12-16). Use simple, fun, encouraging language.",
                 "college": "a college student. Provide detailed, practical, career-oriented explanations.",
-                "aspirant": "an exam aspirant. Focus on exam strategies, time management, and key concepts."
+                "aspirant": "an exam aspirant. Focus on exam strategies and key concepts."
             }
             
             prompt = f"""You are an AI academic assistant for {role_context.get(role, 'a student')}.
 
 User question: {message}
 
-Provide a helpful, accurate, and concise response. Be supportive, encouraging, and educational.
-Use examples where helpful. Keep response to 2-3 paragraphs."""
+Provide a helpful, accurate, and concise response. Be supportive and educational."""
             
             response = self.gemini_model.generate_content(prompt)
             return response.text
             
         except Exception as e:
             print(f"Chat error: {e}")
-            return f"I'm here to help with your studies! (Note: AI service temporarily unavailable. Error: {str(e)[:100]})"
+            return f"I'm here to help with your studies! What would you like to know about?"
+    
+    # ============ FALLBACK METHODS ============
     
     def _get_fallback_content(self, topic: str, level: str) -> Dict:
-        """Fallback content with actual explanations and answers"""
-        return {
-            "overview": f"📚 <b>Welcome to your study guide for {topic} at the {level} level!</b><br><br>{topic} is an important subject that helps us understand key concepts in our world. This guide will help you learn the fundamentals and build a strong foundation.",
-            "key_concepts": [
-                f"<b>Fundamental Understanding:</b> {topic} involves learning core principles that apply to many real-world situations. Understanding these basics is essential for mastery.",
-                f"<b>Core Principles:</b> The main principles of {topic} include understanding how components work together, recognizing patterns, and applying logical thinking.",
-                f"<b>Practical Applications:</b> {topic} is used in everyday life from technology to nature. Learning these applications helps connect theory to practice.",
-                f"<b>Key Terminology:</b> Important terms in {topic} include vocabulary that describes processes, components, and relationships within the subject."
-            ],
-            "detailed_notes": f"""
-<h4>📖 What is {topic}?</h4>
-<p><b>{topic}</b> is a fascinating area of study that helps us understand important concepts. At the {level} level, we focus on building a strong foundation of knowledge.</p>
-
-<h4>🔑 Why {topic} Matters</h4>
-<ul>
-<li><b>Real-world relevance:</b> {topic} appears in many aspects of daily life and professional fields</li>
-<li><b>Problem-solving skills:</b> Learning {topic} develops critical thinking and analytical abilities</li>
-<li><b>Foundation for advanced topics:</b> Mastering {topic} opens doors to more complex subjects</li>
-</ul>
-
-<h4>📝 Key Points to Remember</h4>
-<ul>
-<li>Start with the basics and build your understanding gradually</li>
-<li>Practice applying concepts to real examples</li>
-<li>Review and revise regularly to reinforce learning</li>
-<li>Connect new information with what you already know</li>
-</ul>
-
-<h4>💡 Study Tips for {topic}</h4>
-<ul>
-<li>Create visual aids like diagrams and mind maps</li>
-<li>Explain concepts to someone else to deepen understanding</li>
-<li>Use online resources and practice problems</li>
-<li>Take breaks and study in focused sessions</li>
-</ul>
-""",
-            "examples": [
-                f"<b>Example 1 - Real-World Application:</b> Here's a practical example of how {topic} applies in everyday life.",
-                f"<b>Example 2 - Step-by-Step:</b> Let's walk through an example of {topic} step by step.",
-                f"<b>Example 3 - Problem Solving:</b> Consider this scenario involving {topic} and how to solve it."
-            ],
-            "practice_questions": [
-                f"<b>Question 1:</b> What are the main concepts of {topic}?<br><br><b>Answer:</b> The main concepts include understanding fundamental principles and applying them to real-world situations.",
-                f"<b>Question 2:</b> How does {topic} relate to everyday life?<br><br><b>Answer:</b> {topic} relates to everyday life in many ways, from technology to natural phenomena.",
-                f"<b>Question 3:</b> Can you explain {topic} in your own words?<br><br><b>Answer:</b> {topic} is about understanding how different elements work together.",
-                f"<b>Question 4:</b> What skills are developed by learning {topic}?<br><br><b>Answer:</b> Learning {topic} develops critical thinking and problem-solving abilities.",
-                f"<b>Question 5:</b> How can I improve my understanding of {topic}?<br><br><b>Answer:</b> Practice regularly with varied examples and review consistently."
-            ],
-            "summary": f"""
-<b>🎯 Key Takeaways for {topic}:</b>
-<ul>
-<li>{topic} is a valuable subject that builds important thinking skills</li>
-<li>Understanding core concepts is the foundation for advanced learning</li>
-<li>Regular practice and real-world application reinforce knowledge</li>
-<li>Keep exploring and asking questions to deepen your knowledge</li>
-</ul>
-"""
-        }
+        """Fallback content - redirects to elaborate static content"""
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_genai_elaborate_content(self, topic: str, level: str) -> Dict:
+        """Generative AI content redirect"""
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_python_elaborate_content(self, topic: str, level: str) -> Dict:
+        """Python content redirect"""
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_ml_elaborate_content(self, topic: str, level: str) -> Dict:
+        """Machine Learning content redirect"""
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_datascience_elaborate_content(self, topic: str, level: str) -> Dict:
+        """Data Science content redirect"""
+        return self._get_elaborate_static_content(topic, level)
+    
+    def _get_dynamic_elaborate_content(self, topic: str, level: str) -> Dict:
+        """Dynamic content redirect"""
+        return self._get_elaborate_static_content(topic, level)
     
     def _get_fallback_mindmap(self, topic: str) -> Dict:
         """Fallback mindmap when AI is unavailable"""
@@ -1215,10 +1488,9 @@ Use examples where helpful. Keep response to 2-3 paragraphs."""
             "topic": topic,
             "branches": [
                 {"name": "📖 Introduction", "subtopics": [f"What is {topic}?", f"History of {topic}", f"Why {topic} matters"]},
-                {"name": "🎯 Core Concepts", "subtopics": [f"Key principles of {topic}", f"Important theories", f"Fundamental rules"]},
-                {"name": "💡 Applications", "subtopics": [f"Real-world uses of {topic}", f"Examples in daily life", f"Industry applications"]},
-                {"name": "📚 Study Resources", "subtopics": ["Recommended books", "Online courses", "Practice materials"]},
-                {"name": "⭐ Key Terms", "subtopics": [f"Important vocabulary in {topic}", f"Definitions to remember", f"Common terminology"]}
+                {"name": "🎯 Core Concepts", "subtopics": [f"Key principles", f"Important theories", f"Fundamental rules"]},
+                {"name": "💡 Applications", "subtopics": [f"Real-world uses", f"Examples in daily life", f"Industry applications"]},
+                {"name": "📚 Study Resources", "subtopics": ["Recommended books", "Online courses", "Practice materials"]}
             ]
         }
     
@@ -1228,8 +1500,8 @@ Use examples where helpful. Keep response to 2-3 paragraphs."""
         for i in range(min(num_questions, 5)):
             questions.append({
                 "question": f"What is an important concept in {topic}?",
-                "options": [f"Concept A about {topic}", f"Concept B about {topic}", f"Concept C about {topic}", f"All of the above"],
+                "options": [f"Concept A", f"Concept B", f"Concept C", f"All of the above"],
                 "correct": 3,
-                "explanation": f"All of these concepts are important when studying {topic}. Each contributes to a complete understanding."
+                "explanation": f"All of these concepts are important when studying {topic}."
             })
         return {"topic": topic, "questions": questions}

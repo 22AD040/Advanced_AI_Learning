@@ -6,12 +6,12 @@ load_dotenv()
 
 class Config:
     """Application configuration"""
-    SECRET_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyDXyRJAMGDLiSo3M1vwRcz0BuGYnOqaADc')
+    SECRET_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyCQHhodobMCacO3sIH37tpdvdC8CTprPVk ')
     APP_NAME = "Smart Academic Assistant Pro"
     DEBUG = os.getenv('DEBUG', False)
     
   
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyDXyRJAMGDLiSo3M1vwRcz0BuGYnOqaADc')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyCQHhodobMCacO3sIH37tpdvdC8CTprPVk ')
     
 
     DATA_DIR = "data"
