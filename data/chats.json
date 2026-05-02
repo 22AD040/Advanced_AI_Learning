@@ -1,0 +1,135 @@
+[
+  {
+    "username": "student1",
+    "role": "school",
+    "message": "simple tricks for tables\n",
+    "response": "That's a great question! Let me help you understand this better.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "placements\n",
+    "response": "Placement preparation requires consistent effort. Have you checked our placement guides?",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "placements\nno",
+    "response": "Placement preparation requires consistent effort. Have you checked our placement guides?",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "no",
+    "response": "Great query! Let me provide you with resources to help with your college studies.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "yes",
+    "response": "Great query! Let me provide you with resources to help with your college studies.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "ok",
+    "response": "Great query! Let me provide you with resources to help with your college studies.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "exam",
+    "role": "aspirant",
+    "message": "hi",
+    "response": "Your dedication to exam preparation is commendable. Let me help you optimize your study plan.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "exam",
+    "role": "aspirant",
+    "message": "Create a 6-month study plan",
+    "response": "Your dedication to exam preparation is commendable. Let me help you optimize your study plan.",
+    "timestamp": "2024-01-01T00:00:00"
+  },
+  {
+    "username": "exam",
+    "role": "aspirant",
+    "message": "Create a 6-month study plan",
+    "response": "Your dedication to exam preparation is commendable. Let me help you optimize your study plan.",
+    "timestamp": "2026-04-11T11:48:40.066436"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "hii",
+    "response": "Great query! Let me provide you with resources to help with your college studies.",
+    "timestamp": "2026-04-11T12:19:42.584320"
+  },
+  {
+    "username": "college",
+    "role": "school",
+    "message": "hi\n",
+    "response": "I'm here to help with your studies! What subject would you like to learn about?",
+    "timestamp": "2026-04-13T16:11:52.693085"
+  },
+  {
+    "username": "student1",
+    "role": "aspirant",
+    "message": "hi",
+    "response": "I'm ready to help with your exam preparation! Ask me anything.",
+    "timestamp": "2026-04-13T16:12:53.560212"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "how could i prepare the placements \n",
+    "response": "Placement preparation requires consistent effort. Have you checked our placement guides?",
+    "timestamp": "2026-04-13T17:08:06.882505"
+  },
+  {
+    "username": "student1",
+    "role": "school",
+    "message": "Tricsk for tables",
+    "response": "That's a great question! Let me help you understand this better.",
+    "timestamp": "2026-04-14T12:47:48.607141"
+  },
+  {
+    "username": "student1",
+    "role": "school",
+    "message": "Hello ",
+    "response": "That's a great question! Let me help you understand this better.",
+    "timestamp": "2026-04-14T16:19:25.338014"
+  },
+  {
+    "username": "student1",
+    "role": "school",
+    "message": "time chart list for college placement preparations ",
+    "response": "That's a great question! Let me help you understand this better.",
+    "timestamp": "2026-04-14T16:19:55.471563"
+  },
+  {
+    "username": "college",
+    "role": "college",
+    "message": "placements for college",
+    "response": "Placement preparation requires consistent effort. Have you checked our placement guides?",
+    "timestamp": "2026-04-14T17:01:02.735765"
+  },
+  {
+    "username": "student1",
+    "role": "school",
+    "message": "15 Tables ",
+    "response": "That's a great question! Let me help you understand this better.",
+    "timestamp": "2026-04-15T14:01:15.450369"
+  },
+  {
+    "username": "exam",
+    "role": "aspirant",
+    "message": "Hi",
+    "response": "Your dedication to exam preparation is commendable. Let me help you optimize your study plan.",
+    "timestamp": "2026-04-15T14:32:05.919201"
+  }
+]
