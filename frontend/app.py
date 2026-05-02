@@ -4,16 +4,28 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
+import json
+from groq import Groq
 from app.auth.auth import Authentication
 from app.api.routes import API
 from app.services.llm_service import LLMService
 from app.config import Config
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 auth = Authentication()
 api = API()
 llm = LLMService()
 
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+
+
+if not GROQ_API_KEY:
+    st.error("❌ GROQ_API_KEY not found! Please check your .env file.")
+    st.info("Make sure you have a .env file in the project root with: GROQ_API_KEY=your_api_key_here")
 
 st.set_page_config(
     page_title=Config.APP_NAME,
@@ -23,50 +35,188 @@ st.set_page_config(
 )
 
 def apply_background():
-    """Apply background image to all pages"""
+    """Apply background image - White text for sidebar, BLACK text for main content"""
     st.markdown("""
         <style>
-        /* Main app background */
+        /* Main app background - full screen */
         .stApp {
-            background-image: url("https://i.pinimg.com/736x/ae/26/1d/ae261d83c8c5f7c2a998c984784e4a73.jpg") !important;
+            background-image: url("https://i.pinimg.com/1200x/ef/3a/9a/ef3a9a53d8523aba97ed1777e4215029.jpg") !important;
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
             background-attachment: fixed !important;
+                
         }
         
-        /* Add white overlay for better text readability */
-        .stApp::before {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.88);
-            z-index: -1;
-            pointer-events: none;
+        /* Remove white overlay */
+        .stApp::before, .stApp::after {
+            display: none !important;
         }
         
-        /* Make main content area transparent */
+        /* Add dark overlay to main content area for readability */
         .stAppViewContainer {
+            background-color: rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        /* Header transparent */
+        header[data-testid="stHeader"] {
+            background-color: transparent !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        
+        header[data-testid="stHeader"] > div {
             background-color: transparent !important;
         }
         
-        /* Keep sidebar readable */
-        [data-testid="stSidebar"] {
-            background-color: #000000 !important;  /* Black background */
+        .stApp header {
+            background-color: transparent !important;
         }
         
-        /* Make sidebar text white for readability */
-        [data-testid="stSidebar"] .stMarkdown,
-        [data-testid="stSidebar"] .stRadio label,
-        [data-testid="stSidebar"] .stSelectbox label,
-        [data-testid="stSidebar"] h1, 
-        [data-testid="stSidebar"] h2, 
-        [data-testid="stSidebar"] h3,
-        [data-testid="stSidebar"] p {
+        .st-emotion-cache-12fmjuu {
+            background-color: transparent !important;
+        }
+        
+        [class*="header"] {
+            background-color: transparent !important;
+        }
+        
+        /* Sidebar - dark semi-transparent */
+        [data-testid="stSidebar"] {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            backdrop-filter: blur(8px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        /* SIDEBAR TEXT - WHITE ONLY */
+        [data-testid="stSidebar"] * {
             color: white !important;
+        }
+        
+        /* MAIN CONTENT TEXT - BLACK/DARK */
+        .main * {
+            color: #1a1a1a !important;
+        }
+        
+        /* Headers in main content */
+        .main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
+            color: #0a0a0a !important;
+        }
+        
+        /* Paragraphs in main content */
+        .main p, .main span, .main div, .stMarkdown p {
+            color: #2a2a2a !important;
+        }
+        
+        /* Code blocks */
+        .stCodeBlock, .stCodeBlock * {
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            color: #e0e0e0 !important;
+        }
+        
+        /* Buttons - keep visible */
+        button, .stButton button {
+            color: white !important;
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        /* Info boxes - light background with dark text */
+        .stAlert, .stInfo, .stSuccess, .stWarning, .stError {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            color: #1a1a1a !important;
+        }
+        
+        .stAlert *, .stInfo *, .stSuccess *, .stWarning *, .stError * {
+            color: #1a1a1a !important;
+        }
+        
+        /* Input fields */
+        .stTextInput input, .stTextArea textarea {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            color: #1a1a1a !important;
+            border: 1px solid rgba(0, 0, 0, 0.2) !important;
+        }
+        
+        .stTextInput label, .stTextArea label {
+            color: #1a1a1a !important;
+        }
+        
+        /* Select boxes */
+        .stSelectbox div[data-baseweb="select"] {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            color: #1a1a1a !important;
+        }
+        
+        /* Radio buttons in main content */
+        .stRadio label {
+            color: #1a1a1a !important;
+        }
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2rem;
+            justify-content: center;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            padding: 0.5rem 2rem;
+            font-size: 1rem;
+            color: #1a1a1a !important;
+            background-color: rgba(255, 255, 255, 0.8) !important;
+        }
+        
+        /* Metric cards */
+        [data-testid="stMetric"] label, [data-testid="stMetric"] div {
+            color: #1a1a1a !important;
+        }
+        
+        /* Expander headers */
+        [data-testid="stExpander"] summary p {
+            color: #1a1a1a !important;
+        }
+        
+        /* Download buttons */
+        .stDownloadButton button {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            color: white !important;
+        }
+        
+        /* Links */
+        a {
+            color: #0066cc !important;
+        }
+        
+        /* Better spacing for content containers */
+        .stMarkdown {
+            margin-bottom: 1rem;
+        }
+        
+        /* Improved radio button alignment */
+        .stRadio [role="radiogroup"] {
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Consistent card styling */
+        .stAlert, .stInfo, .stSuccess {
+            border-radius: 10px;
+            padding: 1rem;
+        }
+        
+        /* Better expander styling */
+        .streamlit-expanderHeader {
+            font-weight: 600;
+        }
+        
+        /* Level button styling */
+        .level-button {
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -97,24 +247,601 @@ def init_session_state():
         st.session_state.quiz_active = False
     if 'active_quiz' not in st.session_state:
         st.session_state.active_quiz = None
-    if 'ai_content_school' not in st.session_state:
-        st.session_state.ai_content_school = None
-    if 'ai_mindmap_school' not in st.session_state:
-        st.session_state.ai_mindmap_school = None
-    if 'ai_content_college' not in st.session_state:
-        st.session_state.ai_content_college = None
-    if 'ai_mindmap_college' not in st.session_state:
-        st.session_state.ai_mindmap_college = None
-    if 'ai_content_aspirant' not in st.session_state:
-        st.session_state.ai_content_aspirant = None
-    if 'ai_mindmap_aspirant' not in st.session_state:
-        st.session_state.ai_mindmap_aspirant = None
     if 'quiz_answers_store' not in st.session_state:
         st.session_state.quiz_answers_store = {}
     if 'test_answers_store' not in st.session_state:
         st.session_state.test_answers_store = {}
+    if 'ai_content_generated' not in st.session_state:
+        st.session_state.ai_content_generated = False
+    if 'ai_quiz_generated' not in st.session_state:
+        st.session_state.ai_quiz_generated = False
+    if 'ai_mindmap_generated' not in st.session_state:
+        st.session_state.ai_mindmap_generated = False
 
-# ============ FIXED QUIZ FUNCTION - COLLEGE DASHBOARD ============
+
+class AILearningSystem:
+    """AI-powered learning system using Groq API"""
+    
+    def __init__(self, api_key: str):
+        """Initialize with API key"""
+        self.client = Groq(api_key=api_key)
+        self.model = "llama-3.3-70b-versatile"
+    
+    def generate_content_by_level(self, topic: str, level: str) -> dict:
+        """Generate detailed content about a topic based on difficulty level"""
+        
+        level_descriptions = {
+            "Beginner": "basic introduction, simple explanations, no prior knowledge assumed",
+            "Intermediate": "moderate depth, assumes basic knowledge, includes practical examples",
+            "Advanced": "deep technical details, advanced concepts, real-world applications and best practices"
+        }
+        
+        with st.spinner(f"📚 Generating {level} level content about '{topic}'..."):
+            prompt = f"""You are an expert educator. Create comprehensive {level} level educational content about "{topic}".
+
+Level Description: {level_descriptions[level]}
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "definition": "A clear, 2-3 sentence definition appropriate for {level} level",
+    "detailed_overview": "A detailed 4-5 paragraph explanation with {level} level depth and examples",
+    "key_concepts": [
+        "Key concept 1 with detailed explanation",
+        "Key concept 2 with detailed explanation",
+        "Key concept 3 with detailed explanation",
+        "Key concept 4 with detailed explanation",
+        "Key concept 5 with detailed explanation"
+    ],
+    "practical_examples": [
+        "Practical example 1 relevant to {level} level",
+        "Practical example 2 relevant to {level} level",
+        "Practical example 3 relevant to {level} level"
+    ],
+    "summary": "A concise 2-3 sentence summary highlighting key takeaways for {level} learners"
+}}
+
+Make the content educational, engaging, and appropriate for {level} level learners. Provide approximately 600-1000 words total."""
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are an expert educator. Always respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=4096
+                )
+                
+                content = response.choices[0].message.content
+                content = content.replace('```json', '').replace('```', '').strip()
+                result = json.loads(content)
+                return result
+                
+            except Exception as e:
+                st.error(f"Error generating content: {e}")
+                return self._fallback_content_by_level(topic, level)
+    
+    def generate_quiz_by_level(self, topic: str, num_questions: int = 10, level: str = "Intermediate") -> dict:
+        """Generate quiz questions about a topic based on difficulty level"""
+        
+        with st.spinner(f"📝 Generating {num_questions} {level} level quiz questions about '{topic}'..."):
+            prompt = f"""Create a {level} level quiz about "{topic}" with exactly {num_questions} questions.
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "topic": "{topic}",
+    "level": "{level}",
+    "questions": [
+        {{
+            "question": "Question text here appropriate for {level} level",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct": 0,
+            "explanation": "Detailed {level} level explanation of why this answer is correct"
+        }},
+        ...more questions...
+    ]
+}}
+
+Requirements:
+- Questions must test understanding appropriate for {level} level
+- {level} level questions should have appropriate difficulty
+- Each question must have exactly 4 options
+- "correct" must be the index (0-3) of the correct answer
+- Provide clear educational explanations at {level} level
+- Cover different aspects of {topic} at {level} level
+
+Provide ONLY valid JSON in your response."""
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are an expert quiz creator. Always respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.8,
+                    max_tokens=4096
+                )
+                
+                content = response.choices[0].message.content
+                content = content.replace('```json', '').replace('```', '').strip()
+                result = json.loads(content)
+                
+                if len(result.get('questions', [])) != num_questions:
+                    st.warning(f"Generated {len(result['questions'])} questions (requested {num_questions})")
+                
+                return result
+                
+            except Exception as e:
+                st.error(f"Error generating quiz: {e}")
+                return self._fallback_quiz_by_level(topic, num_questions, level)
+    
+    def generate_mindmap_by_level(self, topic: str, level: str = "Intermediate") -> dict:
+        """Generate a mindmap/learning roadmap based on difficulty level"""
+        
+        with st.spinner(f"🧠 Creating {level} level learning roadmap for '{topic}'..."):
+            prompt = f"""Create a {level} level learning roadmap/mindmap for mastering "{topic}".
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "topic": "{topic}",
+    "level": "{level}",
+    "central_concept": "The main concept of {topic} in one sentence for {level} learners",
+    "main_branches": [
+        {{
+            "name": "Branch name 1",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }},
+        {{
+            "name": "Branch name 2",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }},
+        {{
+            "name": "Branch name 3",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }},
+        {{
+            "name": "Branch name 4",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }}
+    ],
+    "learning_path": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5", "Step 6"]
+}}
+
+Create 4-6 main branches with 4-6 subtopics each appropriate for {level} level. Make it comprehensive and logical for learning {topic} from basics to advanced, tailored for {level} learners."""
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are an expert curriculum designer. Always respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=4096
+                )
+                
+                content = response.choices[0].message.content
+                content = content.replace('```json', '').replace('```', '').strip()
+                result = json.loads(content)
+                return result
+                
+            except Exception as e:
+                st.error(f"Error generating mindmap: {e}")
+                return self._fallback_mindmap_by_level(topic, level)
+    
+    def _fallback_content_by_level(self, topic: str, level: str) -> dict:
+        """Fallback content if API fails"""
+        return {
+            "definition": f"{topic} is an important subject that encompasses key concepts and principles in modern education and technology at {level} level.",
+            "detailed_overview": f"{topic} represents a fundamental area of study with numerous real-world applications. Understanding {topic} requires systematic learning and practical implementation. The field continues to evolve with new developments and innovations, making it an exciting area for {level} learners.",
+            "key_concepts": [
+                f"Concept 1: {topic} requires consistent practice and dedication at {level} level",
+                f"Concept 2: Understanding fundamentals is crucial for mastering {topic} at {level} level",
+                f"Concept 3: Real-world applications help reinforce {level} level learning",
+                f"Concept 4: Regular assessment helps track {level} level progress",
+                f"Concept 5: Collaborative learning can accelerate {level} level understanding"
+            ],
+            "practical_examples": [
+                f"Example 1: Practical application of {topic} for {level} learners",
+                f"Example 2: Real-world scenario demonstrating {topic} at {level} level",
+                f"Example 3: Case study relevant to {level} level understanding"
+            ],
+            "summary": f"{topic} is a valuable subject that builds foundational skills applicable across multiple domains at {level} level."
+        }
+    
+    def _fallback_quiz_by_level(self, topic: str, num_questions: int, level: str) -> dict:
+        """Fallback quiz if API fails"""
+        questions = []
+        for i in range(min(num_questions, 5)):
+            questions.append({
+                "question": f"What is an important {level} level concept in {topic}?",
+                "options": [
+                    f"{level} concept A in {topic}",
+                    f"{level} concept B in {topic}",
+                    f"{level} concept C in {topic}",
+                    f"{level} concept D in {topic}"
+                ],
+                "correct": 0,
+                "explanation": f"This is a fundamental {level} level concept in {topic} that helps build understanding."
+            })
+        
+        return {
+            "topic": topic,
+            "level": level,
+            "questions": questions
+        }
+    
+    def _fallback_mindmap_by_level(self, topic: str, level: str) -> dict:
+        """Fallback mindmap if API fails"""
+        return {
+            "topic": topic,
+            "level": level,
+            "central_concept": f"Understanding {topic} at {level} level from basics to advanced",
+            "main_branches": [
+                {"name": f"Fundamentals ({level})", "subtopics": ["Basic Concepts", "Core Principles", "Key Terminology", "Essential Knowledge"]},
+                {"name": f"Core Topics ({level})", "subtopics": ["Main Concepts", "Important Theories", "Practical Applications", "Case Studies"]},
+                {"name": f"Advanced Concepts ({level})", "subtopics": ["Complex Topics", "Specialized Areas", "Research Directions", "Industry Trends"]},
+                {"name": f"Practice & Assessment ({level})", "subtopics": ["Exercises", "Projects", "Quizzes", "Real-world Problems"]}
+            ],
+            "learning_path": ["Learn fundamentals at " + level + " level", "Practice core concepts", "Explore advanced topics", "Apply knowledge", "Review and assess"]
+        }
+
+
+def display_ai_content_by_level(content: dict, topic: str, level: str):
+    """Display generated content in a nice format with level-based organization"""
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 0.5rem; border-radius: 10px; margin-bottom: 1rem;">
+        <h4 style="color: white; text-align: center;">📚 {level} Level Content</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📖 Definition", expanded=True):
+        st.info(content.get('definition', 'Definition not available'))
+    
+    with st.expander("📚 Detailed Overview", expanded=True):
+        st.write(content.get('detailed_overview', 'Overview not available'))
+    
+    with st.expander("🔑 Key Concepts", expanded=True):
+        key_concepts = content.get('key_concepts', [])
+        if key_concepts:
+            cols = st.columns(2)
+            for idx, concept in enumerate(key_concepts):
+                with cols[idx % 2]:
+                    st.markdown(f"**{idx + 1}.** {concept}")
+    
+    with st.expander("💡 Practical Examples", expanded=True):
+        practical_examples = content.get('practical_examples', [])
+        for idx, example in enumerate(practical_examples, 1):
+            st.markdown(f"**Example {idx}:** {example}")
+            st.markdown("---")
+    
+    with st.expander("📌 Summary", expanded=True):
+        st.success(content.get('summary', 'Summary not available'))
+
+
+def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
+    """Display and evaluate AI-generated quiz by level"""
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 0.5rem; border-radius: 10px; margin-bottom: 1rem;">
+        <h4 style="color: white; text-align: center;">📝 {level} Level Quiz: {quiz.get('topic', topic)}</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"**Total Questions:** {len(quiz.get('questions', []))}")
+    st.markdown("---")
+    
+    questions = quiz.get('questions', [])
+    answers = {}
+    
+    quiz_key = f"ai_quiz_{topic}_{level}_{hash(topic + level)}"
+    
+    if quiz_key not in st.session_state:
+        st.session_state[quiz_key] = {}
+    
+    with st.form(key=f"quiz_form_{quiz_key}"):
+        for i, q in enumerate(questions):
+            with st.container():
+                st.markdown(f"**Question {i+1}:** {q.get('question', 'Question not available')}")
+                
+                options = q.get('options', ['A', 'B', 'C', 'D'])
+                
+                current_answer = st.session_state[quiz_key].get(i)
+                
+                answer = st.radio(
+                     f"Select answer for Q{i+1}",
+                    options,
+                    key=f"{quiz_key}_q_{i}",
+                    index=None,
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+                
+                if answer is not None:
+                    answers[i] = {
+                        'selected': answer,
+                        'selected_index': options.index(answer),
+                        'correct_index': q.get('correct', 0),
+                        'correct_answer': options[q.get('correct', 0)],
+                        'explanation': q.get('explanation', 'No explanation')
+                    }
+                elif current_answer is not None and current_answer in range(len(options)):
+                    answers[i] = {
+                        'selected': options[current_answer],
+                        'selected_index': current_answer,
+                        'correct_index': q.get('correct', 0),
+                        'correct_answer': options[q.get('correct', 0)],
+                        'explanation': q.get('explanation', 'No explanation')
+                    }
+
+
+                st.markdown("---")
+        
+       
+        submitted = st.form_submit_button("✅ Submit Quiz", type="primary", use_container_width=True)
+        
+        if submitted:
+         
+            for i, ans in answers.items():
+                st.session_state[quiz_key][i] = ans['selected_index']
+            
+            if len(answers) == len(questions):
+                score = 0
+                results = []
+                
+                for i, q in enumerate(questions):
+                    if i in answers:
+                        user_answer = answers[i]['selected']
+                        correct_answer = answers[i]['correct_answer']
+                        is_correct = (answers[i]['selected_index'] == answers[i]['correct_index'])
+                        
+                        if is_correct:
+                            score += 1
+                        
+                        results.append({
+                            'question': q.get('question'),
+                            'user_answer': user_answer,
+                            'correct_answer': correct_answer,
+                            'is_correct': is_correct,
+                            'explanation': answers[i]['explanation']
+                        })
+                
+                percentage = (score / len(questions)) * 100
+                
+                st.markdown("---")
+                st.markdown("## 📊 Quiz Results")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("✅ Score", f"{score}/{len(questions)}")
+                with col2:
+                    st.metric("📈 Percentage", f"{percentage:.1f}%")
+                with col3:
+                    if percentage >= 70:
+                        st.metric("Status", "🎉 Passed!")
+                    else:
+                        st.metric("Status", "📚 Keep Practicing")
+                
+              
+                st.session_state.quiz_history.append({
+                    'quiz_title': f"AI Quiz ({level} Level): {topic}",
+                    'score': score,
+                    'total': len(questions),
+                    'percentage': percentage,
+                    'date': datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
+                
+                with st.expander("🔍 View Detailed Results & Explanations"):
+                    for i, res in enumerate(results):
+                        if res['is_correct']:
+                            st.markdown(f"✅ **Q{i+1}:** Correct!")
+                        else:
+                            st.markdown(f"❌ **Q{i+1}:** Incorrect")
+                            st.markdown(f"   **Your answer:** {res['user_answer']}")
+                            st.markdown(f"   **Correct answer:** {res['correct_answer']}")
+                            st.markdown(f"   **📖 Explanation:** {res['explanation']}")
+                        st.markdown("---")
+                
+                if percentage >= 90:
+                    st.balloons()
+                    st.success("🏆 Outstanding! You're a master of this topic!")
+                elif percentage >= 70:
+                    st.success("🎉 Great job! You have good understanding!")
+                elif percentage >= 50:
+                    st.warning("👍 Good effort! Review the material and try again!")
+                else:
+                    st.error("📚 Keep learning! Focus on understanding the concepts.")
+                
+            else:
+                remaining = len(questions) - len(answers)
+                st.warning(f"⚠️ Please answer {remaining} more question(s) before submitting.")
+
+
+def display_mindmap_by_level(mindmap: dict, topic: str, level: str):
+    """Display mindmap/learning roadmap by level with better alignment"""
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 0.5rem; border-radius: 10px; margin-bottom: 1rem;">
+        <h4 style="color: white; text-align: center;">🧠 {level} Level Learning Roadmap: {mindmap.get('topic', topic)}</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("#### 🎯 Central Concept")
+    st.info(mindmap.get('central_concept', 'No central concept defined'))
+    
+    st.markdown("#### 📚 Main Topics")
+    branches = mindmap.get('main_branches', [])
+    
+    if branches:
+        num_cols = min(4, len(branches))
+        cols = st.columns(num_cols)
+        
+        for idx, branch in enumerate(branches):
+            with cols[idx % num_cols]:
+                with st.expander(f"**{branch.get('name', 'Branch')}**", expanded=True):
+                    for sub in branch.get('subtopics', []):
+                        st.markdown(f"• {sub}")
+    
+    st.markdown("---")
+    st.markdown("#### 🗺️ Recommended Learning Path")
+    
+    learning_path = mindmap.get('learning_path', [])
+    for i, step in enumerate(learning_path, 1):
+        st.markdown(f"**Step {i}:** {step}")
+    
+    st.markdown("---")
+    st.markdown("💡 **Tip:** Follow this roadmap for systematic learning. Start with fundamentals and gradually move to advanced topics.")
+
+
+def display_ai_learning():
+    """Main AI Learning interface with level-based tabs - Improved layout"""
+    
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+        <h3 style="color: white;">🤖 AI-Powered Learning Assistant</h3>
+        <p style="color: white;">Learn any topic with AI-generated content, test your knowledge with quizzes, and follow structured learning roadmaps!</p>
+        <p style="color: white; font-size: 0.9rem;">Powered by Groq API</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if not GROQ_API_KEY or GROQ_API_KEY == "":
+        st.error("❌ Groq API key not configured! Please add your API key in the code.")
+        st.info("🔑 Get your API key from: https://console.groq.com")
+        return
+    
+    if 'ai_learning_system_instance' not in st.session_state:
+        try:
+            st.session_state.ai_learning_system_instance = AILearningSystem(GROQ_API_KEY)
+            st.success("✅ AI Learning System initialized successfully!")
+        except Exception as e:
+            st.error(f"❌ Failed to initialize AI Learning System: {e}")
+            return
+    
+    topic_key = f"ai_learning_topic_{st.session_state.get('username', 'default')}"
+    topic = st.text_input(
+        "📚 **Enter a topic to learn:**",
+        placeholder="e.g., Python Programming, Machine Learning, Artificial Intelligence, Cloud Computing",
+        help="Enter any topic you want to learn about",
+        key=topic_key
+    )
+    
+    if topic:
+        st.markdown("#### 🎯 Select Learning Level")
+        level_cols = st.columns(3)
+        
+        with level_cols[0]:
+            beginner_btn = st.button("🌱 Beginner", key=f"beginner_btn_{topic}", use_container_width=True)
+        with level_cols[1]:
+            intermediate_btn = st.button("📘 Intermediate", key=f"intermediate_btn_{topic}", use_container_width=True)
+        with level_cols[2]:
+            advanced_btn = st.button("🚀 Advanced", key=f"advanced_btn_{topic}", use_container_width=True)
+        
+        selected_level = None
+        if beginner_btn:
+            selected_level = "Beginner"
+            st.session_state.selected_level = selected_level
+            if 'ai_content' in st.session_state:
+                del st.session_state.ai_content
+            if 'ai_quiz' in st.session_state:
+                del st.session_state.ai_quiz
+            if 'ai_mindmap' in st.session_state:
+                del st.session_state.ai_mindmap
+            st.session_state.ai_content_generated = False
+            st.session_state.ai_quiz_generated = False
+            st.session_state.ai_mindmap_generated = False
+        elif intermediate_btn:
+            selected_level = "Intermediate"
+            st.session_state.selected_level = selected_level
+            if 'ai_content' in st.session_state:
+                del st.session_state.ai_content
+            if 'ai_quiz' in st.session_state:
+                del st.session_state.ai_quiz
+            if 'ai_mindmap' in st.session_state:
+                del st.session_state.ai_mindmap
+            st.session_state.ai_content_generated = False
+            st.session_state.ai_quiz_generated = False
+            st.session_state.ai_mindmap_generated = False
+        elif advanced_btn:
+            selected_level = "Advanced"
+            st.session_state.selected_level = selected_level
+            if 'ai_content' in st.session_state:
+                del st.session_state.ai_content
+            if 'ai_quiz' in st.session_state:
+                del st.session_state.ai_quiz
+            if 'ai_mindmap' in st.session_state:
+                del st.session_state.ai_mindmap
+            st.session_state.ai_content_generated = False
+            st.session_state.ai_quiz_generated = False
+            st.session_state.ai_mindmap_generated = False
+        elif 'selected_level' in st.session_state:
+            selected_level = st.session_state.selected_level
+        
+        if selected_level:
+            tab1, tab2, tab3 = st.tabs(["📚 Study Content", "📝 Quiz", "🧠 Mindmap"])
+            
+            with tab1:
+                if st.button(f"🚀 Generate {selected_level} Level Content", type="primary", use_container_width=True, key=f"gen_content_{topic}_{selected_level}"):
+                    with st.spinner(f"📚 Generating {selected_level} level content about '{topic}'..."):
+                        content = st.session_state.ai_learning_system_instance.generate_content_by_level(topic, selected_level)
+                        st.session_state.ai_content = content
+                        st.session_state.ai_current_topic = topic
+                        st.session_state.ai_current_level = selected_level
+                        st.session_state.ai_content_generated = True
+                
+                if (st.session_state.get('ai_content_generated', False) and 
+                    'ai_content' in st.session_state and 
+                    st.session_state.ai_current_topic == topic and 
+                    st.session_state.ai_current_level == selected_level):
+                    display_ai_content_by_level(st.session_state.ai_content, topic, selected_level)
+                elif not st.session_state.get('ai_content_generated', False):
+                    st.info(f"👆 Click the button above to generate {selected_level} level study content!")
+            
+            with tab2:
+                col_quiz1, col_quiz2 = st.columns([1, 2])
+                with col_quiz1:
+                    num_questions = st.selectbox("Number of questions:", [5, 10, 15, 20], index=1, key=f"ai_num_questions_{topic}_{selected_level}")
+                
+                if st.button(f"🎯 Generate {selected_level} Level Quiz", type="primary", use_container_width=True, key=f"gen_quiz_{topic}_{selected_level}"):
+                    with st.spinner(f"📝 Generating {num_questions} {selected_level} level quiz questions..."):
+                        quiz = st.session_state.ai_learning_system_instance.generate_quiz_by_level(topic, num_questions, selected_level)
+                        st.session_state.ai_quiz = quiz
+                        st.session_state.ai_quiz_topic = topic
+                        st.session_state.ai_quiz_level = selected_level
+                        st.session_state.ai_quiz_generated = True
+                        quiz_key = f"ai_quiz_{topic}_{selected_level}_{hash(topic + selected_level)}"
+                        if quiz_key in st.session_state:
+                            del st.session_state[quiz_key]
+                
+                if (st.session_state.get('ai_quiz_generated', False) and 
+                    'ai_quiz' in st.session_state and 
+                    st.session_state.ai_quiz_topic == topic and 
+                    st.session_state.ai_quiz_level == selected_level):
+                    display_ai_quiz_by_level(st.session_state.ai_quiz, topic, selected_level)
+                elif not st.session_state.get('ai_quiz_generated', False):
+                    st.info(f"👆 Click the button above to generate a {selected_level} level quiz!")
+            
+            with tab3:
+                if st.button(f"🧠 Generate {selected_level} Level Mindmap", type="primary", use_container_width=True, key=f"gen_mindmap_{topic}_{selected_level}"):
+                    with st.spinner(f"🧠 Creating {selected_level} level learning roadmap..."):
+                        mindmap = st.session_state.ai_learning_system_instance.generate_mindmap_by_level(topic, selected_level)
+                        st.session_state.ai_mindmap = mindmap
+                        st.session_state.ai_mindmap_topic = topic
+                        st.session_state.ai_mindmap_level = selected_level
+                        st.session_state.ai_mindmap_generated = True
+                
+                if (st.session_state.get('ai_mindmap_generated', False) and 
+                    'ai_mindmap' in st.session_state and 
+                    st.session_state.ai_mindmap_topic == topic and 
+                    st.session_state.ai_mindmap_level == selected_level):
+                    display_mindmap_by_level(st.session_state.ai_mindmap, topic, selected_level)
+                elif not st.session_state.get('ai_mindmap_generated', False):
+                    st.info(f"👆 Click the button above to generate a {selected_level} level learning roadmap!")
+    else:
+        st.info("💡 **Enter a topic above to start learning!**\n\nExamples: Python, Machine Learning, Web Development, Data Science, Cloud Computing, Artificial Intelligence")
+
 
 def display_quiz(quiz):
     """Display and evaluate a quiz - WITHOUT ST.RERUN()"""
@@ -130,26 +857,21 @@ def display_quiz(quiz):
     
     st.markdown("---")
     
-  
     quiz_key = f"quiz_{quiz['id']}"
     
-   
     if quiz_key not in st.session_state.quiz_answers_store:
         st.session_state.quiz_answers_store[quiz_key] = {}
     
     answers = {}
     all_answered = True
     
-   
     for i, q in enumerate(quiz['questions']):
         with st.container():
             st.markdown(f"### Question {i+1}")
             st.markdown(f"**{q['question']}**")
             
-        
             current_answer = st.session_state.quiz_answers_store[quiz_key].get(i)
             
-
             selected_option = st.radio(
                 "Select your answer:",
                 q['options'],
@@ -159,7 +881,6 @@ def display_quiz(quiz):
                 label_visibility="collapsed"
             )
             
-          
             if selected_option is not None:
                 answer_index = q['options'].index(selected_option)
                 answers[str(i)] = answer_index
@@ -171,12 +892,10 @@ def display_quiz(quiz):
             
             st.markdown("---")
     
-  
     submit_key = f"submit_{quiz_key}"
     
     if st.button("📤 Submit Quiz", key=submit_key, use_container_width=True, type="primary"):
         if all_answered and len(answers) == len(quiz['questions']):
-        
             score = 0
             detailed_results = []
             
@@ -198,7 +917,6 @@ def display_quiz(quiz):
             
             percentage = (score / len(quiz['questions'])) * 100
             
-          
             st.session_state.quiz_history.append({
                 'quiz_title': quiz['title'],
                 'score': score,
@@ -207,11 +925,9 @@ def display_quiz(quiz):
                 'date': datetime.now().strftime("%Y-%m-%d %H:%M")
             })
             
-           
             if quiz_key in st.session_state.quiz_answers_store:
                 del st.session_state.quiz_answers_store[quiz_key]
             
-          
             st.markdown("## 📊 Your Results")
             
             col1, col2 = st.columns([1, 2])
@@ -266,7 +982,6 @@ def display_quiz(quiz):
             else:
                 st.markdown("📚 **Keep practicing!** Focus on understanding the concepts and try again.")
             
-           
             st.session_state.show_quiz_results = True
             st.session_state.quiz_completed = True
             
@@ -274,17 +989,16 @@ def display_quiz(quiz):
             remaining = len(quiz['questions']) - len(answers)
             st.warning(f"⚠️ Please answer {remaining} more question(s) before submitting.")
     
-   
     if st.session_state.get('quiz_completed', False):
         if st.button("← Back to All Quizzes", key=f"back_{quiz_key}", use_container_width=True):
             st.session_state.selected_quiz = None
             st.session_state.quiz_completed = False
             st.session_state.show_quiz_results = False
-       
             if quiz_key in st.session_state.quiz_answers_store:
                 del st.session_state.quiz_answers_store[quiz_key]
             st.rerun()
-# ============ FIXED ASSESSMENT TEST FUNCTION - EXAM DASHBOARD ============
+
+
 def display_assessment_test(test):
     """Display and evaluate assessment test - SIMPLE WORKING VERSION"""
     st.subheader(f"📝 {test['name']}")
@@ -294,11 +1008,9 @@ def display_assessment_test(test):
     
     answers = {}
     
-   
     for i, q in enumerate(test['questions']):
         st.markdown(f"**Q{i+1}. {q['question']}**")
         
-      
         answer = st.radio(
             "Select your answer:",
             q['options'],
@@ -353,281 +1065,13 @@ def display_assessment_test(test):
                     - Revise regularly to retain concepts
                     """)
                 
-               
                 if st.button("← Back to Tests", use_container_width=True):
                     st.session_state.current_test = None
                     st.rerun()
         else:
             st.warning(f"⚠️ Please answer all {len(test['questions'])} questions before submitting.")
-# ============ AI QUIZ GENERATOR WITH UNIQUE QUESTIONS ============
-def generate_unique_quiz(topic, num_questions=10):
-    """Generate unique quiz questions based on topic"""
-    
-  
-    question_banks = {
-        "python": [
-            {"question": "What is the correct way to create a function in Python?", "options": ["function myFunction():", "def myFunction():", "create myFunction():", "new myFunction():"], "correct": 1, "explanation": "In Python, functions are defined using the 'def' keyword."},
-            {"question": "What does 'PEP' stand for in Python?", "options": ["Python Enhancement Proposal", "Python Execution Protocol", "Python Error Prevention", "Python External Package"], "correct": 0, "explanation": "PEP stands for Python Enhancement Proposal, which are design documents for Python."},
-            {"question": "Which of the following is a mutable data type in Python?", "options": ["Tuple", "String", "List", "Integer"], "correct": 2, "explanation": "Lists are mutable (can be changed), while tuples, strings, and integers are immutable."},
-            {"question": "What is the output of print(2**3)?", "options": ["6", "8", "9", "5"], "correct": 1, "explanation": "** is the exponentiation operator, so 2**3 = 2*2*2 = 8."},
-            {"question": "Which keyword is used to import a module in Python?", "options": ["import", "include", "using", "require"], "correct": 0, "explanation": "The 'import' keyword is used to import modules in Python."},
-            {"question": "What is a lambda function in Python?", "options": ["Anonymous function", "Built-in function", "Recursive function", "Generator function"], "correct": 0, "explanation": "Lambda functions are small anonymous functions defined with the 'lambda' keyword."},
-            {"question": "What does the 'self' parameter refer to in Python classes?", "options": ["The class itself", "The current instance", "A static method", "A class variable"], "correct": 1, "explanation": "self refers to the current instance of the class."},
-            {"question": "Which method is used to add an element to the end of a list?", "options": ["add()", "append()", "insert()", "extend()"], "correct": 1, "explanation": "append() adds an element to the end of a list."},
-            {"question": "What is the correct file extension for Python files?", "options": [".pyth", ".pt", ".py", ".p"], "correct": 2, "explanation": "Python files use the .py extension."},
-            {"question": "What is list comprehension in Python?", "options": ["Creating lists using loops", "Copying lists", "Deleting lists", "Sorting lists"], "correct": 0, "explanation": "List comprehension provides a concise way to create lists using loops."}
-        ],
-        "mathematics": [
-            {"question": "What is the value of π (pi) approximately?", "options": ["3.14", "3.41", "3.12", "3.21"], "correct": 0, "explanation": "π (pi) is approximately 3.14159, commonly rounded to 3.14."},
-            {"question": "What is the square root of 144?", "options": ["10", "11", "12", "13"], "correct": 2, "explanation": "12 × 12 = 144, so the square root is 12."},
-            {"question": "What is 15% of 200?", "options": ["20", "25", "30", "35"], "correct": 2, "explanation": "15% of 200 = (15/100) × 200 = 30."},
-            {"question": "What is the area of a circle with radius 5?", "options": ["25π", "10π", "5π", "15π"], "correct": 0, "explanation": "Area of circle = πr² = π × 25 = 25π."},
-            {"question": "What is the value of 2³?", "options": ["4", "6", "8", "10"], "correct": 2, "explanation": "2³ = 2 × 2 × 2 = 8."},
-            {"question": "What is the Pythagorean theorem?", "options": ["a² + b² = c²", "a + b = c", "a × b = c", "a/b = c"], "correct": 0, "explanation": "In a right triangle, a² + b² = c² where c is the hypotenuse."},
-            {"question": "What is the sum of angles in a triangle?", "options": ["90°", "180°", "270°", "360°"], "correct": 1, "explanation": "The sum of interior angles in any triangle is 180°."},
-            {"question": "What is 7 × 8?", "options": ["48", "56", "64", "72"], "correct": 1, "explanation": "7 × 8 = 56."},
-            {"question": "What is the formula for the circumference of a circle?", "options": ["2πr", "πr²", "πd²", "2πd"], "correct": 0, "explanation": "Circumference = 2πr or πd."},
-            {"question": "What is 25% of 80?", "options": ["15", "20", "25", "30"], "correct": 1, "explanation": "25% of 80 = (25/100) × 80 = 20."}
-        ],
-        "science": [
-            {"question": "What is the chemical symbol for Gold?", "options": ["Go", "Gd", "Au", "Ag"], "correct": 2, "explanation": "Au comes from the Latin word 'aurum' meaning gold."},
-            {"question": "What is the hardest natural substance?", "options": ["Iron", "Diamond", "Platinum", "Steel"], "correct": 1, "explanation": "Diamond is the hardest naturally occurring substance."},
-            {"question": "What is the process by which plants make food?", "options": ["Respiration", "Photosynthesis", "Digestion", "Fermentation"], "correct": 1, "explanation": "Photosynthesis is the process where plants use sunlight to make food."},
-            {"question": "What is the boiling point of water at sea level?", "options": ["90°C", "100°C", "110°C", "120°C"], "correct": 1, "explanation": "Water boils at 100°C (212°F) at sea level."},
-            {"question": "Which planet is known as the Red Planet?", "options": ["Jupiter", "Mars", "Venus", "Saturn"], "correct": 1, "explanation": "Mars is called the Red Planet due to iron oxide on its surface."},
-            {"question": "What is the center of an atom called?", "options": ["Nucleus", "Proton", "Neutron", "Electron"], "correct": 0, "explanation": "The nucleus is the center of an atom containing protons and neutrons."},
-            {"question": "What gas do plants absorb from the air?", "options": ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"], "correct": 2, "explanation": "Plants absorb carbon dioxide for photosynthesis."},
-            {"question": "What is the largest organ in the human body?", "options": ["Heart", "Liver", "Skin", "Brain"], "correct": 2, "explanation": "The skin is the largest organ in the human body."},
-            {"question": "What is the speed of light?", "options": ["300,000 km/s", "150,000 km/s", "450,000 km/s", "600,000 km/s"], "correct": 0, "explanation": "Light travels at approximately 300,000 kilometers per second."},
-            {"question": "What is the chemical symbol for Oxygen?", "options": ["Ox", "Om", "O", "Oy"], "correct": 2, "explanation": "Oxygen's chemical symbol is O."}
-        ],
-        "history": [
-            {"question": "Who painted the Mona Lisa?", "options": ["Van Gogh", "Picasso", "Da Vinci", "Rembrandt"], "correct": 2, "explanation": "Leonardo da Vinci painted the Mona Lisa."},
-            {"question": "In which year did World War II end?", "options": ["1943", "1944", "1945", "1946"], "correct": 2, "explanation": "World War II ended in 1945."},
-            {"question": "Who was the first man to walk on the moon?", "options": ["Buzz Aldrin", "Neil Armstrong", "Michael Collins", "Yuri Gagarin"], "correct": 1, "explanation": "Neil Armstrong was the first person to walk on the moon in 1969."},
-            {"question": "Which ancient civilization built Machu Picchu?", "options": ["Aztecs", "Mayans", "Incas", "Olmecs"], "correct": 2, "explanation": "The Incas built Machu Picchu in the 15th century."},
-            {"question": "Who wrote 'Romeo and Juliet'?", "options": ["Charles Dickens", "Jane Austen", "William Shakespeare", "Mark Twain"], "correct": 2, "explanation": "William Shakespeare wrote Romeo and Juliet."}
-        ]
-    }
-    
-   
-    topic_lower = topic.lower()
-    questions = []
-    
-    for key, bank in question_banks.items():
-        if key in topic_lower or topic_lower in key:
-            questions = bank.copy()
-            break
-    
-   
-    if not questions:
-        questions = question_banks["python"] + question_banks["mathematics"]
-    
-  
-    random.shuffle(questions)
-    selected_questions = questions[:min(num_questions, len(questions))]
-    
-   
-    while len(selected_questions) < num_questions:
-        selected_questions.extend(selected_questions[:num_questions - len(selected_questions)])
-    
-    return {
-        "topic": topic,
-        "questions": selected_questions,
-        "timestamp": datetime.now().timestamp()
-    }
 
-def display_ai_quiz_generator():
-    """AI Quiz Generator with UNIQUE questions each time"""
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
-        <h3 style="color: white;">🎯 AI-Powered Quiz Generator</h3>
-        <p style="color: white;">Generate unique quizzes with different questions each time!</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.session_state.get('quiz_active') and st.session_state.get('active_quiz'):
-        quiz = st.session_state.active_quiz
-        st.markdown(f"## 📝 Quiz: {quiz.get('topic', 'Custom Quiz')}")
-        st.info(f"📊 Total Questions: {len(quiz['questions'])} | ⏱️ Estimated time: {len(quiz['questions']) * 1.5:.0f} minutes | 🎯 Passing Score: 70%")
-        st.markdown("---")
-        
-       
-        ai_quiz_key = f"ai_quiz_{quiz.get('topic', 'custom')}_{quiz.get('timestamp', datetime.now().timestamp())}"
-        
-    
-        if ai_quiz_key not in st.session_state.quiz_answers_store:
-            st.session_state.quiz_answers_store[ai_quiz_key] = {}
-        
-        answers = {}
-        
-       
-        for i, q in enumerate(quiz['questions']):
-            with st.container():
-                st.markdown(f"### Question {i+1}")
-                st.markdown(f"**{q.get('question', 'Question')}**")
-                
-                radio_key = f"{ai_quiz_key}_q_{i}"
-                current_value = st.session_state.quiz_answers_store[ai_quiz_key].get(i)
-                
-                selected_option = st.radio(
-                    "Select your answer:",
-                    q.get('options', ['A', 'B', 'C', 'D']),
-                    key=radio_key,
-                    index=current_value if current_value is not None else None,
-                    horizontal=True,
-                    label_visibility="collapsed"
-                )
-                
-                if selected_option is not None:
-                    answer_index = q.get('options', []).index(selected_option)
-                    answers[str(i)] = answer_index
-                    st.session_state.quiz_answers_store[ai_quiz_key][i] = answer_index
-                elif str(i) in st.session_state.quiz_answers_store[ai_quiz_key]:
-                    answers[str(i)] = st.session_state.quiz_answers_store[ai_quiz_key][i]
-                
-                st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📤 Submit Quiz", use_container_width=True, type="primary", key=f"submit_{ai_quiz_key}"):
-                total_answered = len([k for k in st.session_state.quiz_answers_store.get(ai_quiz_key, {}).keys()])
-                
-                if total_answered == len(quiz['questions']):
-                    
-                    final_answers = {}
-                    for i in range(len(quiz['questions'])):
-                        if i in st.session_state.quiz_answers_store[ai_quiz_key]:
-                            final_answers[str(i)] = st.session_state.quiz_answers_store[ai_quiz_key][i]
-                    
-                    score = 0
-                    detailed_results = []
-                    
-                    for i, q in enumerate(quiz['questions']):
-                        user_answer_idx = final_answers.get(str(i))
-                        is_correct = (user_answer_idx == q.get('correct', 0))
-                        if is_correct:
-                            score += 1
-                        detailed_results.append({
-                            'question': q.get('question'),
-                            'user_answer': q.get('options', [])[user_answer_idx] if user_answer_idx is not None else 'Not answered',
-                            'correct_answer': q.get('options', [])[q.get('correct', 0)],
-                            'is_correct': is_correct,
-                            'explanation': q.get('explanation', 'No explanation')
-                        })
-                    
-                    percentage = (score / len(quiz['questions'])) * 100
-                    
-                    st.session_state.quiz_history.append({
-                        'quiz_title': f"AI Quiz: {quiz.get('topic', 'Custom')}",
-                        'score': score,
-                        'total': len(quiz['questions']),
-                        'percentage': percentage,
-                        'date': datetime.now().strftime("%Y-%m-%d %H:%M")
-                    })
-                    
-                    st.markdown("## 📊 Quiz Results")
-                    
-                    c1, c2, c3, c4 = st.columns(4)
-                    with c1:
-                        st.metric("✅ Correct", f"{score}/{len(quiz['questions'])}")
-                    with c2:
-                        st.metric("❌ Incorrect", f"{len(quiz['questions']) - score}/{len(quiz['questions'])}")
-                    with c3:
-                        st.metric("📊 Percentage", f"{percentage:.1f}%")
-                    with c4:
-                        grade = "A" if percentage >= 90 else "B" if percentage >= 80 else "C" if percentage >= 70 else "D" if percentage >= 60 else "F"
-                        st.metric("🏆 Grade", grade)
-                    
-                    fig = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=percentage,
-                        title={'text': "Score"},
-                        gauge={
-                            'axis': {'range': [0, 100]},
-                            'bar': {'color': "#667eea"},
-                            'steps': [
-                                {'range': [0, 60], 'color': "red"},
-                                {'range': [60, 70], 'color': "orange"},
-                                {'range': [70, 80], 'color': "yellow"},
-                                {'range': [80, 90], 'color': "#90EE90"},
-                                {'range': [90, 100], 'color': "green"}
-                            ],
-                            'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': 70}
-                        }
-                    ))
-                    fig.update_layout(height=300)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    with st.expander("🔍 View Detailed Results & Explanations"):
-                        for i, res in enumerate(detailed_results):
-                            if res['is_correct']:
-                                st.markdown(f"✅ **Q{i+1}** - Correct!")
-                            else:
-                                st.markdown(f"❌ **Q{i+1}** - Incorrect")
-                                st.markdown(f"Your answer: `{res['user_answer']}`")
-                                st.markdown(f"Correct answer: `{res['correct_answer']}`")
-                                st.markdown(f"📖 **Explanation:** {res['explanation']}")
-                            st.markdown("---")
-                    
-                    if percentage >= 90:
-                        st.success("🏆 **Outstanding!** You're a master of this topic!")
-                    elif percentage >= 80:
-                        st.success("🎉 **Excellent!** Great understanding!")
-                    elif percentage >= 70:
-                        st.info("👍 **Good job!** You passed!")
-                    else:
-                        st.warning("📚 **Keep practicing!** Review the material and try again.")
-                    
-                  
-                    if ai_quiz_key in st.session_state.quiz_answers_store:
-                        del st.session_state.quiz_answers_store[ai_quiz_key]
-                    
-                    if st.button("Take Another Quiz", use_container_width=True, key="take_another"):
-                        st.session_state.quiz_active = False
-                        st.session_state.active_quiz = None
-                        st.rerun()
-                else:
-                    remaining = len(quiz['questions']) - total_answered
-                    st.warning(f"⚠️ Please answer {remaining} more question(s) before submitting.")
-        
-        with col2:
-            if st.button("Cancel Quiz", use_container_width=True, key="cancel_ai"):
-                st.session_state.quiz_active = False
-                st.session_state.active_quiz = None
-                if ai_quiz_key in st.session_state.quiz_answers_store:
-                    del st.session_state.quiz_answers_store[ai_quiz_key]
-                st.rerun()
-    
-    else:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            quiz_topic = st.text_input("📚 Quiz Topic:", placeholder="e.g., Python, Mathematics, Science, History", key="ai_quiz_topic")
-            num_questions = st.slider("Number of questions:", 5, 15, 10, key="ai_num_questions")
-        
-        with col2:
-            st.markdown("### Quick Topics")
-            quick_topics = ["Python", "Mathematics", "Science", "History"]
-            for i, qt in enumerate(quick_topics):
-                if st.button(qt, key=f"quick_{qt}_{i}"):
-                    quiz_topic = qt
-                    st.rerun()
-        
-        if st.button("🎲 Generate Unique Quiz", use_container_width=True, type="primary", key="gen_unique_quiz"):
-            if quiz_topic:
-                with st.spinner(f"Generating {num_questions} UNIQUE questions about '{quiz_topic}'..."):
-                    quiz = generate_unique_quiz(quiz_topic, num_questions)
-                    if quiz and quiz.get('questions'):
-                        st.session_state.active_quiz = quiz
-                        st.session_state.quiz_active = True
-                        st.rerun()
-                    else:
-                        st.error("Failed to generate quiz. Please try again.")
-            else:
-                st.warning("Please enter a quiz topic")
 
-# ============ LOGIN PAGE ============
 def login_page():
     """Display login page"""
     st.markdown("""
@@ -703,103 +1147,6 @@ def login_page():
                 st.session_state.show_register = False
                 st.rerun()
 
-# ============ AI CONTENT GENERATOR ============
-def display_ai_content_generator(role_key):
-    """AI Content Generator with role-specific storage"""
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
-        <h3 style="color: white;">🤖 AI-Powered Study Assistant</h3>
-        <p style="color: white;">Generate personalized study content with rich formatting!</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        topic = st.text_input("📚 Enter topic:", placeholder="e.g., Pythagorean Theorem, Photosynthesis, Python Loops", key=f"content_topic_{role_key}")
-        level = st.selectbox("📊 Difficulty:", ["Beginner", "Intermediate", "Advanced"], key=f"content_level_{role_key}")
-        
-        if st.button("✨ Generate Study Content", use_container_width=True, type="primary", key=f"gen_content_btn_{role_key}"):
-            if topic:
-                with st.spinner(f"AI is creating comprehensive content for '{topic}'..."):
-                    content = api.generate_content_with_gemini(topic, level)
-                    if content and not content.get("error"):
-                        st.session_state[f'ai_content_{role_key}'] = content
-                        st.success("✅ Content generated successfully!")
-                    else:
-                        st.error("Could not generate content. Please try again.")
-            else:
-                st.warning("Please enter a topic")
-    
-    with col2:
-        if st.button("🧠 Generate Interactive Mindmap", use_container_width=True, key=f"gen_mindmap_btn_{role_key}"):
-            if topic:
-                with st.spinner(f"Creating interactive roadmap for '{topic}'..."):
-                    mindmap = api.generate_mindmap_with_gemini(topic)
-                    if mindmap:
-                        st.session_state[f'ai_mindmap_{role_key}'] = mindmap
-                        st.success("✅ Mindmap created!")
-            else:
-                st.warning("Please enter a topic first")
-    
-  
-    ai_content = st.session_state.get(f'ai_content_{role_key}')
-    if ai_content:
-        st.markdown("---")
-        st.markdown("## 📖 Generated Study Material")
-        
-        st.markdown("### 📌 Overview")
-        st.info(ai_content.get('overview', 'No overview available'), icon="💡")
-        
-        st.markdown("### 🔑 Key Concepts")
-        key_concepts = ai_content.get('key_concepts', [])
-        if key_concepts:
-            cols = st.columns(2)
-            for idx, concept in enumerate(key_concepts):
-                with cols[idx % 2]:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 10px; margin-bottom: 0.5rem; color: #FFFFFF;">
-                        {concept}
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        st.markdown("### 📝 Detailed Notes")
-        detailed_notes = ai_content.get('detailed_notes', 'No detailed notes')
-        st.markdown(f'<div style="background-color: #f8f9fa; padding: 1rem; border-radius: 10px; color: #000000;">{detailed_notes}</div>', unsafe_allow_html=True)
-        
-        st.markdown("### 💡 Examples")
-        for ex in ai_content.get('examples', []):
-            st.markdown(f"""
-            <div style="background-color: #e8f4f8; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #667eea; color: #000000;">
-                {ex}
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("### ✍️ Practice Questions")
-        for q in ai_content.get('practice_questions', []):
-            st.markdown(f"""
-            <div style="background-color: #f0f8f0; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; color: #000000;">
-                {q}
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("### 📌 Summary")
-        st.success(ai_content.get('summary', 'No summary'), icon="🎯")
-    
-  
-    ai_mindmap = st.session_state.get(f'ai_mindmap_{role_key}')
-    if ai_mindmap:
-        st.markdown("---")
-        st.markdown(f"## 🧠 Learning Roadmap: {ai_mindmap.get('topic', 'Topic')}")
-        
-        branches = ai_mindmap.get('branches', [])
-        if branches:
-            cols = st.columns(min(len(branches), 3))
-            for idx, branch in enumerate(branches):
-                with cols[idx % 3]:
-                    with st.expander(f"{branch.get('name', 'Branch')}", expanded=(idx == 0)):
-                        for sub in branch.get('subtopics', []):
-                            st.markdown(f"• {sub}")
 
 def add_ai_logo_to_sidebar():
     """Add AI logo to the top of sidebar"""
@@ -812,7 +1159,7 @@ def add_ai_logo_to_sidebar():
     """, unsafe_allow_html=True)
     st.sidebar.markdown("---")
 
-# ============ COMPREHENSIVE COLLEGE QUIZZES ============
+
 def get_comprehensive_college_quizzes():
     """Return comprehensive college quizzes with complete answers"""
     return [
@@ -873,7 +1220,7 @@ def get_comprehensive_college_quizzes():
         }
     ]
 
-# ============ SCHOOL STUDENT DASHBOARD ============
+
 def school_student_dashboard():
     """Dashboard for school students"""
     add_ai_logo_to_sidebar()
@@ -1094,16 +1441,11 @@ def school_student_dashboard():
         fig = px.bar(progress_data, x='Subject', y='Progress', 
                     title="Subject-wise Progress", color='Progress')
         st.plotly_chart(fig, use_container_width=True)
-
+    
     elif menu == "🤖 AI Learning":
-        tab1, tab2 = st.tabs(["📚 Content & Mindmap", "🎯 Quiz Generator"])
-        with tab1:
-            display_ai_content_generator("school")
-        with tab2:
-            display_ai_quiz_generator()
+        display_ai_learning()
 
 
-# ============ COLLEGE STUDENT DASHBOARD ============
 def college_student_dashboard():
     """Dashboard for college students"""
     add_ai_logo_to_sidebar()
@@ -1144,16 +1486,13 @@ def college_student_dashboard():
     elif menu == "📝 Quizzes":
         st.header("📝 Practice Quizzes")
         
-      
         if 'quiz_completed' not in st.session_state:
             st.session_state.quiz_completed = False
         
         if st.session_state.selected_quiz and not st.session_state.get('quiz_completed', False):
-          
             col1, col2 = st.columns([5, 1])
             with col2:
                 if st.button("← Back", key="back_from_quiz", use_container_width=True):
-                   
                     quiz_key = f"quiz_{st.session_state.selected_quiz['id']}"
                     if quiz_key in st.session_state.quiz_answers_store:
                         del st.session_state.quiz_answers_store[quiz_key]
@@ -1165,7 +1504,6 @@ def college_student_dashboard():
             display_quiz(st.session_state.selected_quiz)
         
         elif st.session_state.selected_quiz and st.session_state.get('quiz_completed', False):
-           
             if st.button("← Back to All Quizzes", key="back_after_quiz", use_container_width=True):
                 st.session_state.selected_quiz = None
                 st.session_state.quiz_completed = False
@@ -1179,7 +1517,6 @@ def college_student_dashboard():
                     history_df = pd.DataFrame(st.session_state.quiz_history[-10:])
                     st.dataframe(history_df, use_container_width=True)
             
-          
             for i, quiz in enumerate(all_quizzes):
                 if i % 2 == 0:
                     col1, col2 = st.columns(2)
@@ -1188,7 +1525,6 @@ def college_student_dashboard():
                             st.markdown(f"### {quiz['title']}")
                             st.markdown(f"📊 {len(quiz['questions'])} Questions | ⏱️ {len(quiz['questions']) * 2} minutes")
                             if st.button(f"Start {quiz['title']}", key=f"start_quiz_{quiz['id']}"):
-                               
                                 quiz_key = f"quiz_{quiz['id']}"
                                 if quiz_key in st.session_state.quiz_answers_store:
                                     del st.session_state.quiz_answers_store[quiz_key]
@@ -1239,13 +1575,9 @@ def college_student_dashboard():
             st.plotly_chart(fig, use_container_width=True)
     
     elif menu == "🤖 AI Learning":
-        tab1, tab2 = st.tabs(["📚 Content & Mindmap", "🎯 Quiz Generator"])
-        with tab1:
-            display_ai_content_generator("college")
-        with tab2:
-            display_ai_quiz_generator()
+        display_ai_learning()
 
-# ============ EXAM ASPIRANT DASHBOARD ============
+
 def exam_aspirant_dashboard():
     """Dashboard for exam aspirants"""
     add_ai_logo_to_sidebar()
@@ -1456,7 +1788,6 @@ def exam_aspirant_dashboard():
             st.markdown("---")
             display_assessment_test(st.session_state.current_test)
             if st.button("← Back to Tests", use_container_width=True):
-                # Clear test answers
                 for key in list(st.session_state.test_answers_store.keys()):
                     if key.startswith("test_"):
                         del st.session_state.test_answers_store[key]
@@ -1551,14 +1882,9 @@ def exam_aspirant_dashboard():
         st.plotly_chart(fig, use_container_width=True)
     
     elif menu == "🤖 AI Learning":
-        tab1, tab2 = st.tabs(["📚 Content & Mindmap", "🎯 Quiz Generator"])
-        with tab1:
-            display_ai_content_generator("aspirant")
-        with tab2:
-            display_ai_quiz_generator()
+        display_ai_learning()
 
 
-# ============ MAIN APP ============
 def main_app():
     """Main application router"""
     apply_background()  

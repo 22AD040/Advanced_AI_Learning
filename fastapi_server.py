@@ -1,40 +1,65 @@
-"""
-FastAPI Server for Smart Academic Assistant Pro
-"""
-
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, Request, HTTPException, status
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, List, Any
-from datetime import datetime, timedelta
-from contextlib import asynccontextmanager
+from typing import Optional, List, Dict, Any
+import os
+import json
+import uvicorn
+from datetime import datetime
+from groq import Groq
+from dotenv import load_dotenv
 
-# Fix JWT import - use this instead of just 'import jwt'
-try:
-    from jose import jwt  # More secure, recommended
-    JOSE_AVAILABLE = True
-except ImportError:
-    import jwt  # Fallback if jose not available
-    JOSE_AVAILABLE = False
-    print("⚠️ Using pyjwt instead of python-jose. Install python-jose for better security.")
 
-# Import your existing modules
-from app.auth.auth import Authentication
-from app.api.routes import API
-from app.services.llm_service import LLMService
-from app.config import Config
+load_dotenv()
 
-# Initialize your existing services (same as in Streamlit)
-auth = Authentication()
-api = API()
-llm = LLMService()
 
-# JWT settings for API authentication
-SECRET_KEY = Config.SECRET_KEY if hasattr(Config, 'SECRET_KEY') else "your-secret-key-change-this"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+app = FastAPI(
+    title="Smart Academic Assistant API",
+    description="AI-Powered Learning Platform API",
+    version="1.0.0",
+)
 
-# Pydantic models for API requests/responses
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not found in environment variables. Please check your .env file.")
+
+
+client = Groq(api_key=GROQ_API_KEY)
+model = "llama-3.3-70b-versatile"
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[Message]
+    topic: Optional[str] = None
+    level: Optional[str] = "Intermediate"
+
+class QuizRequest(BaseModel):
+    topic: str
+    num_questions: int = 10
+    level: str = "Intermediate"
+
+class ContentRequest(BaseModel):
+    topic: str
+    level: str = "Intermediate"
+
+class MindmapRequest(BaseModel):
+    topic: str
+    level: str = "Intermediate"
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -45,330 +70,445 @@ class RegisterRequest(BaseModel):
     email: str
     role: str
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: Optional[str] = None
-    username: str
-    role: str
-
-class ContentRequest(BaseModel):
-    topic: str
-    level: str = "Intermediate"
-    role: str = "college"
-
-class QuizRequest(BaseModel):
-    topic: str
-    num_questions: int = 10
-
-class QuizSubmitRequest(BaseModel):
-    quiz_id: str
-    answers: Dict[str, int]
-
-class TestSubmitRequest(BaseModel):
-    test_id: int
-    answers: Dict[str, int]
-
-class MessageResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[Any] = None
-
-# Create FastAPI app
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    print("🚀 FastAPI Server Starting...")
-    print(f"✅ Authentication Service: Ready")
-    print(f"✅ LLM Service: {'Available' if llm.gemini_available else 'Using Fallback'}")
-    print(f"✅ API Service: Ready")
-    yield
-    # Shutdown
-    print("👋 FastAPI Server Shutting Down...")
-
-app = FastAPI(
-    title="Smart Academic Assistant Pro API",
-    description="REST API for academic content generation, quizzes, and authentication",
-    version="1.0.0",
-    lifespan=lifespan
-)
-
-# CORS middleware - allows Streamlit frontend to call this API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to your Streamlit domain
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Helper functions
-def create_access_token(data: dict):
-    """Create JWT token for API authentication"""
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-def verify_token(token: str):
-    """Verify JWT token"""
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except jwt.PyJWTError:
-        return None
-
-# ============ AUTHENTICATION ENDPOINTS ============
-
-@app.post("/api/auth/login", response_model=MessageResponse)
-async def api_login(request: LoginRequest):
-    """
-    Authenticate user and return JWT token
-    """
-    result = auth.login_user(request.username, request.password)
-    
-    if result['success']:
-        # Create JWT token for API access
-        access_token = create_access_token(
-            data={"sub": request.username, "role": result['user']['role']}
-        )
-        
-        return MessageResponse(
-            success=True,
-            message=result['message'],
-            data={
-                "access_token": access_token,
-                "token_type": "bearer",
-                "username": request.username,
-                "role": result['user']['role']
-            }
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=result['message']
-        )
-
-@app.post("/api/auth/register", response_model=MessageResponse)
-async def api_register(request: RegisterRequest):
-    """
-    Register new user
-    """
-    result = auth.register_user(request.username, request.password, request.email, request.role)
-    
-    if result['success']:
-        return MessageResponse(
-            success=True,
-            message=result['message'],
-            data={"username": request.username, "role": request.role}
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result['message']
-        )
-
-@app.post("/api/auth/verify")
-async def api_verify_token(token: str):
-    """
-    Verify JWT token
-    """
-    payload = verify_token(token)
-    if payload:
-        return {"valid": True, "username": payload.get("sub"), "role": payload.get("role")}
-    else:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-# ============ CONTENT GENERATION ENDPOINTS ============
-
-@app.post("/api/content/generate", response_model=MessageResponse)
-async def api_generate_content(request: ContentRequest):
-    """
-    Generate study content using AI
-    """
-    try:
-        # Use your existing LLM service
-        content = llm.generate_study_content_with_ai(request.topic, request.level)
-        
-        return MessageResponse(
-            success=True,
-            message=f"Content generated for {request.topic}",
-            data=content
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Content generation failed: {str(e)}"
-        )
-
-@app.post("/api/mindmap/generate", response_model=MessageResponse)
-async def api_generate_mindmap(topic: str):
-    """
-    Generate interactive mindmap for a topic
-    """
-    try:
-        mindmap = llm.generate_mindmap_with_ai(topic)
-        
-        return MessageResponse(
-            success=True,
-            message=f"Mindmap generated for {topic}",
-            data=mindmap
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Mindmap generation failed: {str(e)}"
-        )
-
-@app.post("/api/quiz/generate", response_model=MessageResponse)
-async def api_generate_quiz(request: QuizRequest):
-    """
-    Generate AI-powered quiz on a topic
-    """
-    try:
-        quiz = llm.generate_quiz_with_ai(request.topic, request.num_questions)
-        
-        return MessageResponse(
-            success=True,
-            message=f"Quiz generated for {request.topic}",
-            data=quiz
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Quiz generation failed: {str(e)}"
-        )
-
-# ============ QUIZ AND TEST ENDPOINTS ============
-
-@app.get("/api/quizzes/college")
-async def api_get_college_quizzes():
-    """
-    Get all college quizzes
-    """
-    # Import your quiz function
-    from streamlit_app import get_comprehensive_college_quizzes
-    quizzes = get_comprehensive_college_quizzes()
-    return {"quizzes": quizzes}
-
-@app.post("/api/quiz/submit", response_model=MessageResponse)
-async def api_submit_quiz(request: QuizSubmitRequest):
-    """
-    Submit quiz answers and get evaluation
-    """
-    # This would need to access your quiz data
-    # For now, returns a structure
-    return MessageResponse(
-        success=True,
-        message="Quiz submitted",
-        data={"score": 0, "total": 0, "percentage": 0, "results": []}
-    )
-
-@app.post("/api/test/submit", response_model=MessageResponse)
-async def api_submit_test(request: TestSubmitRequest):
-    """
-    Submit assessment test and get evaluation
-    """
-    try:
-        result = api.evaluate_assessment_test(request.test_id, request.answers)
-        
-        return MessageResponse(
-            success=True,
-            message="Test submitted successfully",
-            data=result
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Test submission failed: {str(e)}"
-        )
-
-# ============ STUDY MATERIALS ENDPOINTS ============
-
-@app.get("/api/materials/school/{subject}")
-async def api_get_school_materials(subject: str):
-    """
-    Get school study materials for a subject
-    """
-    materials = api.get_school_study_materials(subject)
-    return {"subject": subject, "materials": materials}
-
-@app.get("/api/placement-guides")
-async def api_get_placement_guides():
-    """
-    Get placement preparation guides
-    """
-    guides = api.get_placement_guides()
-    return {"guides": guides}
-
-@app.get("/api/project-solutions")
-async def api_get_project_solutions():
-    """
-    Get project solutions and examples
-    """
-    projects = api.get_project_solutions()
-    return {"projects": projects}
-
-@app.get("/api/subject-time-charts")
-async def api_get_subject_time_charts():
-    """
-    Get subject-wise time allocation charts for exam aspirants
-    """
-    charts = api.get_subject_time_charts()
-    return {"charts": charts}
-
-@app.get("/api/assessment-tests")
-async def api_get_assessment_tests():
-    """
-    Get assessment tests for exam aspirants
-    """
-    tests = api.get_assessment_tests()
-    return {"tests": tests}
-
-# ============ HEALTH CHECK ============
-
-@app.get("/api/health")
-async def api_health_check():
-    """
-    Check API health and service status
-    """
-    return {
-        "status": "healthy",
-        "services": {
-            "authentication": "active",
-            "llm_service": "active" if llm.gemini_available else "fallback_mode",
-            "api_service": "active"
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
 @app.get("/")
 async def root():
-    """
-    API root endpoint
-    """
     return {
-        "name": "Smart Academic Assistant Pro API",
-        "version": "1.0.0",
-        "status": "running",
+        "message": "🎓 Smart Academic Assistant API is running!",
+        "status": "active",
+        "docs": "/docs",
+        "redoc": "/redoc",
         "endpoints": {
-            "auth": "/api/auth/login, /api/auth/register",
-            "content": "/api/content/generate, /api/mindmap/generate",
-            "quizzes": "/api/quiz/generate, /api/quizzes/college",
-            "tests": "/api/assessment-tests, /api/test/submit",
-            "materials": "/api/materials/school/{subject}, /api/placement-guides"
+            "health": "/health",
+            "generate_content": "/generate/content (POST)",
+            "generate_quiz": "/generate/quiz (POST)",
+            "generate_mindmap": "/generate/mindmap (POST)",
+            "chat": "/chat (POST)",
+            "auth_login": "/auth/login (POST)",
+            "auth_register": "/auth/register (POST)"
         }
     }
 
-# ============ RUN SERVER ============
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "groq_api_configured": bool(GROQ_API_KEY)
+    }
+
+@app.post("/generate/content")
+async def generate_content(request: ContentRequest):
+    """Generate educational content based on topic and level"""
+    try:
+        level_descriptions = {
+            "Beginner": "basic introduction, simple explanations, no prior knowledge assumed",
+            "Intermediate": "moderate depth, assumes basic knowledge, includes practical examples",
+            "Advanced": "deep technical details, advanced concepts, real-world applications and best practices"
+        }
+        
+        prompt = f"""You are an expert educator. Create comprehensive {request.level} level educational content about "{request.topic}".
+
+Level Description: {level_descriptions.get(request.level, level_descriptions['Intermediate'])}
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "definition": "A clear, 2-3 sentence definition appropriate for {request.level} level",
+    "detailed_overview": "A detailed 4-5 paragraph explanation with {request.level} level depth and examples",
+    "key_concepts": [
+        "Key concept 1 with detailed explanation",
+        "Key concept 2 with detailed explanation",
+        "Key concept 3 with detailed explanation",
+        "Key concept 4 with detailed explanation",
+        "Key concept 5 with detailed explanation"
+    ],
+    "practical_examples": [
+        "Practical example 1 relevant to {request.level} level",
+        "Practical example 2 relevant to {request.level} level",
+        "Practical example 3 relevant to {request.level} level"
+    ],
+    "summary": "A concise 2-3 sentence summary highlighting key takeaways for {request.level} learners"
+}}
+
+Make the content educational, engaging, and appropriate for {request.level} level learners."""
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an expert educator. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4096
+        )
+        
+        content = response.choices[0].message.content
+        content = content.replace('```json', '').replace('```', '').strip()
+        result = json.loads(content)
+        
+        return {"success": True, "data": result, "topic": request.topic, "level": request.level}
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+@app.post("/generate/quiz")
+async def generate_quiz(request: QuizRequest):
+    """Generate quiz questions based on topic and level"""
+    try:
+        prompt = f"""Create a {request.level} level quiz about "{request.topic}" with exactly {request.num_questions} questions.
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "topic": "{request.topic}",
+    "level": "{request.level}",
+    "questions": [
+        {{
+            "question": "Question text here",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct": 0,
+            "explanation": "Detailed explanation"
+        }}
+    ]
+}}
+
+Each question must have exactly 4 options. 'correct' must be the index (0-3) of the correct answer.
+Provide ONLY valid JSON in your response."""
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an expert quiz creator. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.8,
+            max_tokens=4096
+        )
+        
+        content = response.choices[0].message.content
+        content = content.replace('```json', '').replace('```', '').strip()
+        result = json.loads(content)
+        
+        return {"success": True, "data": result}
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+@app.post("/generate/mindmap")
+async def generate_mindmap(request: MindmapRequest):
+    """Generate learning roadmap/mindmap based on topic and level"""
+    try:
+        prompt = f"""Create a {request.level} level learning roadmap/mindmap for mastering "{request.topic}".
+
+Format your response as JSON with EXACTLY this structure:
+{{
+    "topic": "{request.topic}",
+    "level": "{request.level}",
+    "central_concept": "The main concept in one sentence",
+    "main_branches": [
+        {{
+            "name": "Branch name 1",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }},
+        {{
+            "name": "Branch name 2",
+            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
+        }}
+    ],
+    "learning_path": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5", "Step 6"]
+}}
+
+Create 4-6 main branches with 4-6 subtopics each.
+Provide ONLY valid JSON in your response."""
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an expert curriculum designer. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4096
+        )
+        
+        content = response.choices[0].message.content
+        content = content.replace('```json', '').replace('```', '').strip()
+        result = json.loads(content)
+        
+        return {"success": True, "data": result}
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """Interactive chat with AI assistant"""
+    try:
+        system_prompt = """You are a helpful educational assistant. Help students with their academic questions, 
+        provide explanations, study tips, and guidance. Be supportive and educational."""
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in request.messages:
+            messages.append({"role": msg.role, "content": msg.content})
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024
+        )
+        
+        return {
+            "success": True,
+            "response": response.choices[0].message.content,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+
+users_db = {}
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest):
+    """Register a new user"""
+    try:
+        if request.username in users_db:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Username already exists"}
+            )
+        
+        users_db[request.username] = {
+            "username": request.username,
+            "password": request.password,
+            "email": request.email,
+            "role": request.role,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        return {
+            "success": True,
+            "message": "Registration successful",
+            "user": {"username": request.username, "role": request.role}
+        }
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(e)}
+        )
+
+@app.post("/auth/login")
+async def login(request: LoginRequest):
+    """Login user"""
+    try:
+        user = users_db.get(request.username)
+        
+        if not user or user["password"] != request.password:
+            return JSONResponse(
+                status_code=401,
+                content={"success": False, "message": "Invalid credentials"}
+            )
+        
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": {"username": request.username, "role": user["role"]}
+        }
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(e)}
+        )
+
+@app.get("/materials/school/{subject}")
+async def get_school_materials(subject: str):
+    """Get school study materials by subject"""
+    materials = {
+        "Mathematics": {
+            "Algebra": "Comprehensive Algebra guide",
+            "Geometry": "Geometry concepts",
+            "Calculus": "Calculus fundamentals"
+        },
+        "Science": {
+            "Physics": "Physics fundamentals",
+            "Chemistry": "Chemical reactions",
+            "Biology": "Living organisms"
+        },
+        "English": {
+            "Grammar": "Grammar rules",
+            "Literature": "Literary analysis"
+        },
+        "Social Studies": {
+            "History": "Historical events",
+            "Geography": "Physical geography"
+        },
+        "Computer Science": {
+            "Programming": "Programming basics",
+            "Web Development": "Web technologies"
+        }
+    }
+    
+    return {
+        "success": True,
+        "subject": subject,
+        "materials": materials.get(subject, {})
+    }
+
+@app.get("/materials/placement")
+async def get_placement_guides():
+    """Get placement preparation guides"""
+    guides = {
+        "Aptitude Test Guide": "Complete aptitude preparation",
+        "Technical Interview Guide": "Technical questions",
+        "HR Interview Guide": "HR interview tips",
+        "Resume Building Guide": "Resume creation guide"
+    }
+    
+    return {"success": True, "guides": guides}
+
+@app.get("/projects")
+async def get_projects():
+    """Get project examples"""
+    projects = [
+        {
+            "id": 1,
+            "title": "E-commerce Website",
+            "description": "Full-stack e-commerce platform",
+            "technologies": ["React", "Node.js", "MongoDB"],
+            "features": ["Authentication", "Products", "Cart", "Payment"]
+        },
+        {
+            "id": 2,
+            "title": "Task Management App",
+            "description": "Project management tool",
+            "technologies": ["Vue.js", "Express", "PostgreSQL"],
+            "features": ["Tasks", "Real-time", "Collaboration"]
+        }
+    ]
+    
+    return {"success": True, "projects": projects}
+
+@app.get("/tests/assessment")
+async def get_assessment_tests():
+    """Get assessment tests"""
+    tests = [
+        {
+            "id": 1,
+            "name": "Quantitative Aptitude Test",
+            "duration": "45 minutes",
+            "difficulty": "Medium",
+            "topics": ["Number System", "Algebra", "Geometry"]
+        },
+        {
+            "id": 2,
+            "name": "Logical Reasoning Test",
+            "duration": "35 minutes",
+            "difficulty": "Medium",
+            "topics": ["Analytical", "Puzzles"]
+        }
+    ]
+    
+    return {"success": True, "tests": tests}
+
+@app.get("/time-charts")
+async def get_time_charts():
+    """Get time allocation charts"""
+    charts = {
+        "Quantitative Aptitude": {
+            "Time Allocation": "60 hours",
+            "Weekly Plan": "12 hours per week"
+        },
+        "Logical Reasoning": {
+            "Time Allocation": "50 hours",
+            "Weekly Plan": "10 hours per week"
+        }
+    }
+    
+    return {"success": True, "charts": charts}
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """HTML dashboard"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Smart Academic Assistant API</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                text-align: center;
+            }
+            .card {
+                background: rgba(255,255,255,0.95);
+                color: #333;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+            }
+            .docs-link {
+                display: inline-block;
+                background: #667eea;
+                color: white;
+                padding: 10px 20px;
+                text-decoration: none;
+                border-radius: 5px;
+                margin: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎓 Smart Academic Assistant API</h1>
+            <p>AI-Powered Learning Platform</p>
+            <div class="card">
+                <h2>📚 API Documentation</h2>
+                <a href="/docs" class="docs-link">📖 Interactive API Docs</a>
+                <a href="/redoc" class="docs-link">📕 ReDoc Documentation</a>
+            </div>
+            <div class="card">
+                <h2>🚀 Ready to Use</h2>
+                <p>API is running successfully!</p>
+                <p>Visit <strong>/docs</strong> for interactive documentation</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
 if __name__ == "__main__":
-    import uvicorn
-    print("=" * 50)
-    print("🚀 Starting FastAPI Server for Smart Academic Assistant Pro")
-    print("=" * 50)
-    print(f"📚 API Docs: http://localhost:8000/docs")
-    print(f"🔧 Alternative Docs: http://localhost:8000/redoc")
-    print(f"💚 Health Check: http://localhost:8000/api/health")
-    print("=" * 50)
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    print("🚀 Starting Smart Academic Assistant API Server...")
+    print("📍 Server will run at: http://localhost:8000")
+    print("📚 API Documentation: http://localhost:8000/docs")
+    print("🔧 Press CTRL+C to stop the server")
+    print("-" * 50)
+    
+    uvicorn.run(
+        app, 
+        host="127.0.0.1",  
+        port=8000,
+        log_level="info",
+        reload=False  
+    )
