@@ -1,28 +1,38 @@
-![GitHub stars](https://img.shields.io/github/stars/22AD040/Advanced_AI_Learning?style=social)
-![GitHub forks](https://img.shields.io/github/forks/22AD040/Advanced_AI_Learning?style=social)
-![GitHub repo size](https://img.shields.io/github/repo-size/22AD040/Advanced_AI_Learning)
-![GitHub last commit](https://img.shields.io/github/last-commit/22AD040/Advanced_AI_Learning)
+<p align="center">
+  <img src="https://img.shields.io/github/stars/22AD040/Advanced_AI_Learning?style=social"/>
+  <img src="https://img.shields.io/github/forks/22AD040/Advanced_AI_Learning?style=social"/>
+  <img src="https://img.shields.io/github/repo-size/22AD040/Advanced_AI_Learning"/>
+  <img src="https://img.shields.io/github/last-commit/22AD040/Advanced_AI_Learning"/>
+</p>
 
-<br>
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11-blue"/>
+  <img src="https://img.shields.io/badge/FastAPI-Backend-green"/>
+  <img src="https://img.shields.io/badge/Streamlit-Frontend-red"/>
+  <img src="https://img.shields.io/badge/Uvicorn-ASGI-purple"/>
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
-![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-red)
-![Uvicorn](https://img.shields.io/badge/Uvicorn-ASGI-purple)
+<p align="center">
+  <img src="https://img.shields.io/badge/Groq-LLM-orange"/>
+  <img src="https://img.shields.io/badge/LLaMA-3.3--70B-yellow"/>
+  <img src="https://img.shields.io/badge/Generative-AI-brightgreen"/>
+</p>
 
-![Groq](https://img.shields.io/badge/Groq-LLM-orange)
-![LLaMA](https://img.shields.io/badge/LLaMA-3.3--70B-yellow)
-![Generative AI](https://img.shields.io/badge/Generative-AI-brightgreen)
+<p align="center">
+  <img src="https://img.shields.io/badge/Auth-bcrypt-blueviolet"/>
+  <img src="https://img.shields.io/badge/Storage-JSON-lightgrey"/>
+  <img src="https://img.shields.io/badge/PDF-ReportLab-orange"/>
+</p>
 
-![Authentication](https://img.shields.io/badge/Auth-bcrypt-blueviolet)
-![Database](https://img.shields.io/badge/Storage-JSON-lightgrey)
-![PDF](https://img.shields.io/badge/PDF-ReportLab-orange)
+<p align="center">
+  <img src="https://img.shields.io/badge/Deploy-Render-blue"/>
+  <img src="https://img.shields.io/badge/Frontend-StreamlitCloud-red"/>
+  <img src="https://img.shields.io/badge/Docker-Supported-2496ED"/>
+</p>
 
-![Deployment](https://img.shields.io/badge/Deploy-Render-blue)
-![Frontend](https://img.shields.io/badge/Frontend-StreamlitCloud-red)
-![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)
-
-![License](https://img.shields.io/badge/License-MIT-brightgreen)
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-brightgreen"/>
+</p>
 
 ---
 
