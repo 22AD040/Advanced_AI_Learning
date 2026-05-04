@@ -45,13 +45,10 @@
 ## 🚀 Live Demo
 
 🌐 Frontend:  
-https://smart-academic-assistant-pro.streamlit.app
+https://advancedailearning-7mq5dbuhcraycstv8kjvep.streamlit.app/
 
 ⚙️ Backend API:  
 https://advanced-ai-learning-1-w542.onrender.com
-
-🧠Server will run at:
-http://localhost:8000
 
 📚 API Docs:  
 http://localhost:8000/docs
