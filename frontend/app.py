@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
 import json
+import re
 from groq import Groq
 from app.auth.auth import Authentication
 from app.api.routes import API
@@ -19,13 +20,13 @@ auth = Authentication()
 api = API()
 llm = LLMService()
 
-
+# Get API key from environment variable only - NEVER hardcode
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-
 
 if not GROQ_API_KEY:
     st.error("❌ GROQ_API_KEY not found! Please check your .env file.")
     st.info("Make sure you have a .env file in the project root with: GROQ_API_KEY=your_api_key_here")
+    st.stop()
 
 st.set_page_config(
     page_title=Config.APP_NAME,
@@ -34,8 +35,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def safe_json_parse(content: str):
+    """Safely parse JSON even with control characters"""
+    try:
+        # Remove markdown code blocks if present
+        content = re.sub(r'```json\s*', '', content)
+        content = re.sub(r'```\s*', '', content)
+        
+        # Remove invalid control characters (ASCII 0-31 except tab, newline, carriage return)
+        content = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', content)
+        
+        # Clean up any remaining issues
+        content = content.strip()
+        
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        # If still failing, try to extract JSON using regex
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except:
+                pass
+        raise e
+
 def apply_background():
-    """Apply background image - White text for sidebar, BLACK text for main content"""
+    """Apply background image and custom styling"""
     st.markdown("""
         <style>
         /* Main app background - full screen */
@@ -114,12 +139,89 @@ def apply_background():
             color: #e0e0e0 !important;
         }
         
-        /* Buttons - keep visible */
-        button, .stButton button {
+        /* ============ UPDATED BUTTON STYLES ============ */
+        
+        /* Primary buttons (main action buttons) */
+        .stButton button[kind="primary"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             color: white !important;
-            background-color: rgba(0, 0, 0, 0.7) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            padding: 0.6rem 1.2rem !important;
+            border-radius: 10px !important;
+            border: none !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
+        
+        .stButton button[kind="primary"]:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+        }
+        
+        /* Regular buttons */
+        .stButton button {
+            background-color: #4CAF50 !important;
+            color: white !important;
+            font-weight: 500 !important;
+            border-radius: 8px !important;
+            border: none !important;
+            padding: 0.5rem 1rem !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton button:hover {
+            background-color: #45a049 !important;
+            transform: scale(1.02) !important;
+        }
+        
+        /* Submit buttons in forms */
+        .stForm button[type="submit"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            padding: 0.75rem !important;
+            border-radius: 10px !important;
+        }
+        
+        /* Download buttons */
+        .stDownloadButton button {
+            background-color: #FF9800 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 0.5rem 1rem !important;
+        }
+        
+        .stDownloadButton button:hover {
+            background-color: #f57c00 !important;
+            transform: scale(1.02) !important;
+        }
+        
+        /* Sidebar buttons */
+        [data-testid="stSidebar"] .stButton button {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+        
+        [data-testid="stSidebar"] .stButton button:hover {
+            background-color: rgba(255, 255, 255, 0.3) !important;
+            transform: scale(1.02) !important;
+        }
+        
+        /* Danger/Delete buttons */
+        .stButton button[data-testid="baseButton-destructive"] {
+            background-color: #dc3545 !important;
+            color: white !important;
+        }
+        
+        .stButton button[data-testid="baseButton-destructive"]:hover {
+            background-color: #c82333 !important;
+        }
+        
+        /* ============ END BUTTON STYLES ============ */
         
         /* Info boxes - light background with dark text */
         .stAlert, .stInfo, .stSuccess, .stWarning, .stError {
@@ -174,12 +276,6 @@ def apply_background():
         /* Expander headers */
         [data-testid="stExpander"] summary p {
             color: #1a1a1a !important;
-        }
-        
-        /* Download buttons */
-        .stDownloadButton button {
-            background-color: rgba(0, 0, 0, 0.7) !important;
-            color: white !important;
         }
         
         /* Links */
@@ -258,12 +354,13 @@ def init_session_state():
     if 'ai_mindmap_generated' not in st.session_state:
         st.session_state.ai_mindmap_generated = False
 
-
 class AILearningSystem:
     """AI-powered learning system using Groq API"""
     
     def __init__(self, api_key: str):
         """Initialize with API key"""
+        if not api_key:
+            raise ValueError("API key is required")
         self.client = Groq(api_key=api_key)
         self.model = "llama-3.3-70b-versatile"
     
@@ -300,13 +397,14 @@ Format your response as JSON with EXACTLY this structure:
     "summary": "A concise 2-3 sentence summary highlighting key takeaways for {level} learners"
 }}
 
-Make the content educational, engaging, and appropriate for {level} level learners. Provide approximately 600-1000 words total."""
+Make the content educational, engaging, and appropriate for {level} level learners. Provide approximately 600-1000 words total.
+IMPORTANT: Return ONLY valid JSON. No markdown, no extra text, no control characters."""
 
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are an expert educator. Always respond with valid JSON only."},
+                        {"role": "system", "content": "You are an expert educator. Always respond with valid JSON only. Do not include any control characters, markdown formatting, or extra text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
@@ -314,12 +412,12 @@ Make the content educational, engaging, and appropriate for {level} level learne
                 )
                 
                 content = response.choices[0].message.content
-                content = content.replace('```json', '').replace('```', '').strip()
-                result = json.loads(content)
+                # Use safe parsing
+                result = safe_json_parse(content)
                 return result
                 
             except Exception as e:
-                st.error(f"Error generating content: {e}")
+                st.error(f"Error generating content: {str(e)}")
                 return self._fallback_content_by_level(topic, level)
     
     def generate_quiz_by_level(self, topic: str, num_questions: int = 10, level: str = "Intermediate") -> dict:
@@ -338,26 +436,23 @@ Format your response as JSON with EXACTLY this structure:
             "options": ["Option A", "Option B", "Option C", "Option D"],
             "correct": 0,
             "explanation": "Detailed {level} level explanation of why this answer is correct"
-        }},
-        ...more questions...
+        }}
     ]
 }}
 
 Requirements:
 - Questions must test understanding appropriate for {level} level
-- {level} level questions should have appropriate difficulty
 - Each question must have exactly 4 options
 - "correct" must be the index (0-3) of the correct answer
 - Provide clear educational explanations at {level} level
-- Cover different aspects of {topic} at {level} level
 
-Provide ONLY valid JSON in your response."""
+IMPORTANT: Return ONLY valid JSON. No markdown, no extra text, no control characters."""
 
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are an expert quiz creator. Always respond with valid JSON only."},
+                        {"role": "system", "content": "You are an expert quiz creator. Always respond with valid JSON only. Do not include any control characters, markdown formatting, or extra text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.8,
@@ -365,8 +460,8 @@ Provide ONLY valid JSON in your response."""
                 )
                 
                 content = response.choices[0].message.content
-                content = content.replace('```json', '').replace('```', '').strip()
-                result = json.loads(content)
+                # Use safe parsing
+                result = safe_json_parse(content)
                 
                 if len(result.get('questions', [])) != num_questions:
                     st.warning(f"Generated {len(result['questions'])} questions (requested {num_questions})")
@@ -374,7 +469,7 @@ Provide ONLY valid JSON in your response."""
                 return result
                 
             except Exception as e:
-                st.error(f"Error generating quiz: {e}")
+                st.error(f"Error generating quiz: {str(e)}")
                 return self._fallback_quiz_by_level(topic, num_questions, level)
     
     def generate_mindmap_by_level(self, topic: str, level: str = "Intermediate") -> dict:
@@ -396,26 +491,19 @@ Format your response as JSON with EXACTLY this structure:
         {{
             "name": "Branch name 2",
             "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
-        }},
-        {{
-            "name": "Branch name 3",
-            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
-        }},
-        {{
-            "name": "Branch name 4",
-            "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3", "Subtopic 4"]
         }}
     ],
     "learning_path": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5", "Step 6"]
 }}
 
-Create 4-6 main branches with 4-6 subtopics each appropriate for {level} level. Make it comprehensive and logical for learning {topic} from basics to advanced, tailored for {level} learners."""
+Create 4-6 main branches with 4-6 subtopics each appropriate for {level} level.
+IMPORTANT: Return ONLY valid JSON. No markdown, no extra text, no control characters."""
 
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are an expert curriculum designer. Always respond with valid JSON only."},
+                        {"role": "system", "content": "You are an expert curriculum designer. Always respond with valid JSON only. Do not include any control characters, markdown formatting, or extra text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
@@ -423,12 +511,12 @@ Create 4-6 main branches with 4-6 subtopics each appropriate for {level} level. 
                 )
                 
                 content = response.choices[0].message.content
-                content = content.replace('```json', '').replace('```', '').strip()
-                result = json.loads(content)
+                # Use safe parsing
+                result = safe_json_parse(content)
                 return result
                 
             except Exception as e:
-                st.error(f"Error generating mindmap: {e}")
+                st.error(f"Error generating mindmap: {str(e)}")
                 return self._fallback_mindmap_by_level(topic, level)
     
     def _fallback_content_by_level(self, topic: str, level: str) -> dict:
@@ -488,7 +576,6 @@ Create 4-6 main branches with 4-6 subtopics each appropriate for {level} level. 
             "learning_path": ["Learn fundamentals at " + level + " level", "Practice core concepts", "Explore advanced topics", "Apply knowledge", "Review and assess"]
         }
 
-
 def display_ai_content_by_level(content: dict, topic: str, level: str):
     """Display generated content in a nice format with level-based organization"""
     
@@ -521,7 +608,6 @@ def display_ai_content_by_level(content: dict, topic: str, level: str):
     with st.expander("📌 Summary", expanded=True):
         st.success(content.get('summary', 'Summary not available'))
 
-
 def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
     """Display and evaluate AI-generated quiz by level"""
     
@@ -537,11 +623,14 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
     questions = quiz.get('questions', [])
     answers = {}
     
+    # Use a consistent key without timestamp for radio persistence
     quiz_key = f"ai_quiz_{topic}_{level}_{hash(topic + level)}"
     
+    # Store answers for this quiz instance
     if quiz_key not in st.session_state:
         st.session_state[quiz_key] = {}
     
+    # Create a form to handle all questions together
     with st.form(key=f"quiz_form_{quiz_key}"):
         for i, q in enumerate(questions):
             with st.container():
@@ -549,10 +638,12 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
                 
                 options = q.get('options', ['A', 'B', 'C', 'D'])
                 
+                # Get current answer from session state
                 current_answer = st.session_state[quiz_key].get(i)
                 
+                # Use radio with consistent key
                 answer = st.radio(
-                     f"Select answer for Q{i+1}",
+                    f"Select answer for Q{i+1}",
                     options,
                     key=f"{quiz_key}_q_{i}",
                     index=None,
@@ -560,6 +651,7 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
                     label_visibility="collapsed"
                 )
                 
+                # Store answer temporarily
                 if answer is not None:
                     answers[i] = {
                         'selected': answer,
@@ -569,6 +661,7 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
                         'explanation': q.get('explanation', 'No explanation')
                     }
                 elif current_answer is not None and current_answer in range(len(options)):
+                    # If there was a previously stored answer, use it
                     answers[i] = {
                         'selected': options[current_answer],
                         'selected_index': current_answer,
@@ -577,14 +670,12 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
                         'explanation': q.get('explanation', 'No explanation')
                     }
 
-
                 st.markdown("---")
         
-       
         submitted = st.form_submit_button("✅ Submit Quiz", type="primary", use_container_width=True)
         
         if submitted:
-         
+            # Store answers in session state
             for i, ans in answers.items():
                 st.session_state[quiz_key][i] = ans['selected_index']
             
@@ -625,7 +716,7 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
                     else:
                         st.metric("Status", "📚 Keep Practicing")
                 
-              
+                # Store in quiz history
                 st.session_state.quiz_history.append({
                     'quiz_title': f"AI Quiz ({level} Level): {topic}",
                     'score': score,
@@ -658,7 +749,6 @@ def display_ai_quiz_by_level(quiz: dict, topic: str, level: str):
             else:
                 remaining = len(questions) - len(answers)
                 st.warning(f"⚠️ Please answer {remaining} more question(s) before submitting.")
-
 
 def display_mindmap_by_level(mindmap: dict, topic: str, level: str):
     """Display mindmap/learning roadmap by level with better alignment"""
@@ -695,7 +785,6 @@ def display_mindmap_by_level(mindmap: dict, topic: str, level: str):
     st.markdown("---")
     st.markdown("💡 **Tip:** Follow this roadmap for systematic learning. Start with fundamentals and gradually move to advanced topics.")
 
-
 def display_ai_learning():
     """Main AI Learning interface with level-based tabs - Improved layout"""
     
@@ -707,11 +796,13 @@ def display_ai_learning():
     </div>
     """, unsafe_allow_html=True)
     
+    # Check API key
     if not GROQ_API_KEY or GROQ_API_KEY == "":
-        st.error("❌ Groq API key not configured! Please add your API key in the code.")
+        st.error("❌ Groq API key not configured! Please add your API key in the .env file.")
         st.info("🔑 Get your API key from: https://console.groq.com")
         return
     
+    # Initialize learning system
     if 'ai_learning_system_instance' not in st.session_state:
         try:
             st.session_state.ai_learning_system_instance = AILearningSystem(GROQ_API_KEY)
@@ -720,6 +811,7 @@ def display_ai_learning():
             st.error(f"❌ Failed to initialize AI Learning System: {e}")
             return
     
+    # Topic input with unique key
     topic_key = f"ai_learning_topic_{st.session_state.get('username', 'default')}"
     topic = st.text_input(
         "📚 **Enter a topic to learn:**",
@@ -729,6 +821,7 @@ def display_ai_learning():
     )
     
     if topic:
+        # Level selection
         st.markdown("#### 🎯 Select Learning Level")
         level_cols = st.columns(3)
         
@@ -739,10 +832,12 @@ def display_ai_learning():
         with level_cols[2]:
             advanced_btn = st.button("🚀 Advanced", key=f"advanced_btn_{topic}", use_container_width=True)
         
+        # Determine selected level
         selected_level = None
         if beginner_btn:
             selected_level = "Beginner"
             st.session_state.selected_level = selected_level
+            # Clear previous data when level changes
             if 'ai_content' in st.session_state:
                 del st.session_state.ai_content
             if 'ai_quiz' in st.session_state:
@@ -780,9 +875,11 @@ def display_ai_learning():
             selected_level = st.session_state.selected_level
         
         if selected_level:
+            # Create tabs for different features
             tab1, tab2, tab3 = st.tabs(["📚 Study Content", "📝 Quiz", "🧠 Mindmap"])
             
             with tab1:
+                # Generate button for content
                 if st.button(f"🚀 Generate {selected_level} Level Content", type="primary", use_container_width=True, key=f"gen_content_{topic}_{selected_level}"):
                     with st.spinner(f"📚 Generating {selected_level} level content about '{topic}'..."):
                         content = st.session_state.ai_learning_system_instance.generate_content_by_level(topic, selected_level)
@@ -791,6 +888,7 @@ def display_ai_learning():
                         st.session_state.ai_current_level = selected_level
                         st.session_state.ai_content_generated = True
                 
+                # Display content only if generated and matches current topic/level
                 if (st.session_state.get('ai_content_generated', False) and 
                     'ai_content' in st.session_state and 
                     st.session_state.ai_current_topic == topic and 
@@ -800,10 +898,12 @@ def display_ai_learning():
                     st.info(f"👆 Click the button above to generate {selected_level} level study content!")
             
             with tab2:
+                # Quiz generation controls
                 col_quiz1, col_quiz2 = st.columns([1, 2])
                 with col_quiz1:
                     num_questions = st.selectbox("Number of questions:", [5, 10, 15, 20], index=1, key=f"ai_num_questions_{topic}_{selected_level}")
                 
+                # Generate quiz button
                 if st.button(f"🎯 Generate {selected_level} Level Quiz", type="primary", use_container_width=True, key=f"gen_quiz_{topic}_{selected_level}"):
                     with st.spinner(f"📝 Generating {num_questions} {selected_level} level quiz questions..."):
                         quiz = st.session_state.ai_learning_system_instance.generate_quiz_by_level(topic, num_questions, selected_level)
@@ -811,10 +911,12 @@ def display_ai_learning():
                         st.session_state.ai_quiz_topic = topic
                         st.session_state.ai_quiz_level = selected_level
                         st.session_state.ai_quiz_generated = True
+                        # Clear any previous quiz answers from session state
                         quiz_key = f"ai_quiz_{topic}_{selected_level}_{hash(topic + selected_level)}"
                         if quiz_key in st.session_state:
                             del st.session_state[quiz_key]
                 
+                # Display quiz only if generated
                 if (st.session_state.get('ai_quiz_generated', False) and 
                     'ai_quiz' in st.session_state and 
                     st.session_state.ai_quiz_topic == topic and 
@@ -841,7 +943,6 @@ def display_ai_learning():
                     st.info(f"👆 Click the button above to generate a {selected_level} level learning roadmap!")
     else:
         st.info("💡 **Enter a topic above to start learning!**\n\nExamples: Python, Machine Learning, Web Development, Data Science, Cloud Computing, Artificial Intelligence")
-
 
 def display_quiz(quiz):
     """Display and evaluate a quiz - WITHOUT ST.RERUN()"""
@@ -998,7 +1099,6 @@ def display_quiz(quiz):
                 del st.session_state.quiz_answers_store[quiz_key]
             st.rerun()
 
-
 def display_assessment_test(test):
     """Display and evaluate assessment test - SIMPLE WORKING VERSION"""
     st.subheader(f"📝 {test['name']}")
@@ -1070,7 +1170,6 @@ def display_assessment_test(test):
                     st.rerun()
         else:
             st.warning(f"⚠️ Please answer all {len(test['questions'])} questions before submitting.")
-
 
 def login_page():
     """Display login page"""
@@ -1147,7 +1246,6 @@ def login_page():
                 st.session_state.show_register = False
                 st.rerun()
 
-
 def add_ai_logo_to_sidebar():
     """Add AI logo to the top of sidebar"""
     st.sidebar.markdown("""
@@ -1158,7 +1256,6 @@ def add_ai_logo_to_sidebar():
     </div>
     """, unsafe_allow_html=True)
     st.sidebar.markdown("---")
-
 
 def get_comprehensive_college_quizzes():
     """Return comprehensive college quizzes with complete answers"""
@@ -1219,7 +1316,6 @@ def get_comprehensive_college_quizzes():
             ]
         }
     ]
-
 
 def school_student_dashboard():
     """Dashboard for school students"""
@@ -1445,7 +1541,6 @@ def school_student_dashboard():
     elif menu == "🤖 AI Learning":
         display_ai_learning()
 
-
 def college_student_dashboard():
     """Dashboard for college students"""
     add_ai_logo_to_sidebar()
@@ -1576,7 +1671,6 @@ def college_student_dashboard():
     
     elif menu == "🤖 AI Learning":
         display_ai_learning()
-
 
 def exam_aspirant_dashboard():
     """Dashboard for exam aspirants"""
@@ -1883,7 +1977,6 @@ def exam_aspirant_dashboard():
     
     elif menu == "🤖 AI Learning":
         display_ai_learning()
-
 
 def main_app():
     """Main application router"""
