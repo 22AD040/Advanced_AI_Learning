@@ -3,32 +3,24 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/22AD040/Advanced_AI_Learning)
 ![GitHub last commit](https://img.shields.io/github/last-commit/22AD040/Advanced_AI_Learning)
 
----
+<br>
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-red)
 ![Uvicorn](https://img.shields.io/badge/Uvicorn-ASGI-purple)
 
----
-
 ![Groq](https://img.shields.io/badge/Groq-LLM-orange)
 ![LLaMA](https://img.shields.io/badge/LLaMA-3.3--70B-yellow)
 ![Generative AI](https://img.shields.io/badge/Generative-AI-brightgreen)
-
----
 
 ![Authentication](https://img.shields.io/badge/Auth-bcrypt-blueviolet)
 ![Database](https://img.shields.io/badge/Storage-JSON-lightgrey)
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-orange)
 
----
-
 ![Deployment](https://img.shields.io/badge/Deploy-Render-blue)
-![Frontend Deploy](https://img.shields.io/badge/Frontend-StreamlitCloud-red)
+![Frontend](https://img.shields.io/badge/Frontend-StreamlitCloud-red)
 ![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)
-
----
 
 ![License](https://img.shields.io/badge/License-MIT-brightgreen)
 
@@ -178,7 +170,7 @@ The platform is designed for **School Students, College Learners, and Competitiv
 ![Daily](assets/school/schedule_daily.png)
 ![Weekly](assets/school/schedule_weekly.png)
 ![Goals](assets/school/goals_tracking.png)
-![Progress](assets/school/progress_chart.png)
+![Progress](assets/school/prograss_chart.png)
 
 ---
 
@@ -193,7 +185,7 @@ The platform is designed for **School Students, College Learners, and Competitiv
 ### 🎯 Exam Aspirant
 ![Plan](assets/exam_aspirant/study_plan.png)
 ![Tips](assets/exam_aspirant/tips.png)
-![Assessment](assets/exam_aspirant/assessment.png)
+![Assessment](assets/exam_aspirant/assesment.png)
 ![Progress](assets/exam_aspirant/progress.png)
 
 ---
